@@ -1,0 +1,4 @@
+/* A work fills whatever square it's given, whether its own tab or a gallery frame. */
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ground, #111); }
+body { display: flex; align-items: center; justify-content: center; }
+canvas { display: block; width: min(100vw, 100vh) !important; height: min(100vw, 100vh) !important; }

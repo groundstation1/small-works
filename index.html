@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Small works</title>
+<script src="works.js"></script>
+<style>
+  /* One page, three distances: everything, a series together, one work.
+     Names live in the tab and the address bar; nothing is written on the wall. */
+  :root { --wall: #1b1b1a; --gap: 6vw; --S: min(86vh, 72vw); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--wall); transition: background-color 1.2s ease; }
+  body { overflow-x: hidden; }
+  img, iframe { display: block; border: 0; }
+  button { all: unset; cursor: pointer; }
+  ::view-transition-group(*) { animation-duration: .55s; animation-timing-function: cubic-bezier(.3, .7, .2, 1); }
+
+  /* everything / a series: stills in a grid */
+  .grid { min-height: 100vh; max-width: 1400px; margin: 0 auto; padding: 10vh 5vw; display: flex; flex-wrap: wrap;
+          justify-content: center; align-content: center; gap: 6vh 5vw; }
+  .tile { position: relative; width: clamp(200px, 34vmin, 440px); aspect-ratio: 1; cursor: zoom-in; }
+  .grid.series { gap: 3vmin; max-width: calc(var(--cols) * 27vmin + (var(--cols) - 1) * 3vmin + 10vw); }   /* a series hangs as a block */
+  .grid.series .tile { width: 27vmin; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* one work: a strip of the series, this one in the middle, its neighbours at the edges */
+  .stage { position: fixed; inset: 0; overflow: hidden; }
+  .slide { position: absolute; top: 50%; left: 50%; width: var(--S); height: var(--S); cursor: pointer; }
+  .slide img, .slide iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .slide iframe { opacity: 0; transition: opacity .5s ease; pointer-events: none; }
+  .slide iframe.ready { opacity: 1; }
+  .slide.here { cursor: zoom-out; }
+  .slide.here iframe.touch { pointer-events: auto; }
+  .slide:not(.here) { opacity: .55; transition: opacity .3s; }
+  .slide:not(.here):hover { opacity: .9; }
+
+  /* the way back, surfacing when the hand moves */
+  .back { position: fixed; top: 14px; left: 16px; font: 20px/1 system-ui, sans-serif; color: #888; mix-blend-mode: difference;
+          opacity: 0; transition: opacity .4s; padding: 6px; z-index: 2; }
+  .back.on, .back:hover { opacity: 1; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<button class="back" aria-label="step back">←</button>
+<script>
+  const app = document.getElementById('app'), back = document.querySelector('.back');
+  const byId = id => WORKS.find(w => w.id === id);
+  const tint = c => { document.documentElement.style.backgroundColor = c || ''; document.body.style.backgroundColor = c || ''; };
+  const vt = (id, k) => `t-${id}-${k}`;
+
+  // ---------- where we are ----------
+  // { at: 'all' } · { at: 'series', w } · { at: 'one', w, k }
+  function parse() {
+    const q = new URLSearchParams(location.search), w = byId(q.get('w'));
+    if (!w) return { at: 'all' };
+    const n = views(w).length, k = +q.get('plate');
+    if (n > 1 && !k) return { at: 'series', w };
+    return { at: 'one', w, k: Math.min(n, Math.max(1, k || 1)), pass: [...q].filter(([a]) => a !== 'w' && a !== 'plate') };
+  }
+  function url(s) {
+    if (s.at === 'all') return './';
+    const q = new URLSearchParams({ w: s.w.id });
+    if (s.at === 'one' && views(s.w).length > 1) q.set('plate', s.k);
+    return '?' + q;
+  }
+  function go(s, how = 'push') {
+    if (how === 'push') history.pushState(null, '', url(s));
+    if (how === 'replace') history.replaceState(null, '', url(s));
+    const paint = () => render(s);
+    if (document.startViewTransition && how !== 'none') document.startViewTransition(paint); else paint();
+  }
+  function stepBack(s) {
+    if (s.at === 'one' && views(s.w).length > 1) return { at: 'series', w: s.w };
+    return { at: 'all' };
+  }
+  let state;
+  addEventListener('popstate', () => go(parse(), 'pop'));
+
+  // ---------- drawing a distance ----------
+  function render(s) {
+    state = s;
+    app.innerHTML = '';
+    if (s.at === 'all') {
+      document.title = 'Small works';
+      tint('');
+      const grid = el('div', 'grid');
+      for (const w of WORKS.slice().reverse()) {
+        const c = (w.cover || 1), v = views(w)[c - 1];
+        const t = tile(v.thumb, vt(w.id, c), `${w.title}, ${w.year}`);
+        t.onclick = () => go(views(w).length > 1 ? { at: 'series', w } : { at: 'one', w, k: 1 });
+        t.onmouseenter = () => tint(w.ground); t.onmouseleave = () => tint('');
+        grid.append(t);
+      }
+      app.append(grid);
+    }
+    if (s.at === 'series') {
+      document.title = `${s.w.title}, ${s.w.year}`;
+      tint(s.w.ground);
+      const grid = el('div', 'grid series');
+      grid.style.setProperty('--cols', views(s.w).length <= 4 ? 2 : 3);
+      views(s.w).forEach((v, j) => {
+        const t = tile(v.thumb, vt(s.w.id, j + 1), `${v.name}, ${s.w.year}`);
+        t.onclick = () => go({ at: 'one', w: s.w, k: j + 1 });
+        grid.append(t);
+      });
+      app.append(grid);
+      grid.onclick = e => { if (e.target === grid) go(stepBack(s)); };
+    }
+    if (s.at === 'one') {
+      const vs = views(s.w), v = vs[s.k - 1];
+      document.title = `${v.name}, ${s.w.year}`;
+      tint(v.ground);
+      const stage = el('div', 'stage');
+      vs.forEach((u, j) => {
+        const d = j + 1 - s.k;
+        if (Math.abs(d) > 2) return;                               // only what could be seen
+        const slide = el('div', 'slide' + (d === 0 ? ' here' : ''));
+        slide.style.transform = `translate(calc(-50% + ${d} * (var(--S) + var(--gap))), -50%)`;
+        slide.style.viewTransitionName = vt(s.w.id, j + 1);
+        const img = new Image(); img.src = u.thumb; img.alt = ''; slide.append(img);
+        if (d === 0) {
+          const f = document.createElement('iframe');
+          f.title = u.name;
+          if (u.interactive) f.className = 'touch';
+          f.src = workSrc(u, Object.fromEntries(s.pass || []));
+          f.onload = () => setTimeout(() => f.classList.add('ready'), u.folder === 'drag' ? 60 : 450);
+          slide.append(f);
+          if (!u.interactive) slide.onclick = () => go(stepBack(s)); // the same click that zoomed in zooms out
+        } else slide.onclick = () => go({ at: 'one', w: s.w, k: j + 1 }, 'replace');
+        stage.append(slide);
+      });
+      stage.onclick = e => { if (e.target === stage) go(stepBack(s)); };
+      app.append(stage);
+    }
+    back.style.display = s.at === 'all' ? 'none' : '';
+  }
+
+  function el(tag, cls) { const e = document.createElement(tag); e.className = cls; return e; }
+  function tile(src, name, label) {
+    const t = el('div', 'tile'); t.title = label; t.style.viewTransitionName = name;
+    const img = new Image(); img.src = src; img.alt = label; t.append(img);
+    return t;
+  }
+
+  // ---------- hands and keys ----------
+  const step = d => {
+    if (state.at !== 'one') return;
+    const n = views(state.w).length, k = state.k + d;
+    if (n < 2) return;
+    if (k > n) return go({ at: 'series', w: state.w });           // after the last: the whole series again
+    if (k >= 1) go({ at: 'one', w: state.w, k }, 'replace');
+  };
+  addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') step(1);
+    if (e.key === 'ArrowLeft') step(-1);
+    if (e.key === 'Escape' && state.at !== 'all') go(stepBack(state));
+  });
+  let wheelLock = 0;
+  addEventListener('wheel', e => {                                 // any scroll or trackpad swipe steps: down or right is on
+    if (state.at !== 'one') return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(d) < 12 || Date.now() < wheelLock) return;
+    wheelLock = Date.now() + 700; step(d > 0 ? 1 : -1);
+  }, { passive: true });
+  let tx = null;
+  addEventListener('touchstart', e => tx = e.touches[0].clientX, { passive: true });
+  addEventListener('touchend', e => {
+    if (tx === null || state.at !== 'one') return;
+    const dx = e.changedTouches[0].clientX - tx; tx = null;
+    if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1);
+  });
+  back.onclick = () => go(stepBack(state));
+  let hide; addEventListener('mousemove', () => { back.classList.add('on'); clearTimeout(hide); hide = setTimeout(() => back.classList.remove('on'), 1600); });
+
+  render(parse());
+</script>
+</body></html>

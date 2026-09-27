@@ -1,0 +1,52 @@
+# Manifesto
+
+Read this before starting any new work in this gallery. Rewrite it after every work.
+
+**Follow the rabbit hole.**
+
+Build something whose outcome you can't predict, then look at what it actually does. Go deeper into whatever surprises you, not back toward what you meant to make. The mean is what you get when you already know the result.
+
+**Provoke accidents.**
+
+Misuse the tool. Feed the output back into the input, use the wrong wrap mode, lose precision, push a parameter ten times too far. Keep the bug that's better than the intention.
+
+**Make many, look, choose.**
+
+Contact sheets, not single attempts. Mutate what's strange, run it again, look again. Three rounds at least before anything is called finished. Judge at full size: thumbnails lie. Often the work is a series: one procedure, several plates, and the choosing is part of it.
+
+**The work must come from you.**
+
+Self-expression isn't confession. It's the particular way you see. Two artists given the same prompt will make different choices—what to emphasize, what to leave out, what rhythm feels right. That's the work.
+
+**No illustration.**
+
+If the work can be retold as an anecdote (a letter, an empty room, the one who won't conform), it's an illustration of an idea, not the work. No punchlines, no metaphors with a reveal, no objects standing in for feelings. The experience has to be the thing itself.
+
+**All the way, or not at all.**
+
+Either it's indistinguishable from the real, with real optics, real materials and real reference, or it's openly its own material: colour, light, pixels, number, time. Nothing in between. Procedural "paper", noise "wood", drop-shadow "depth" is the cheap middle, and it always shows. Any medium that gets there: the tool is chosen by the work, never the other way round.
+
+**Measure against real art.**
+
+Not against the previous piece. Put it next to Agnes Martin, Bridget Riley, Vera Molnár, James Turrell, Ryoji Ikeda. If it looks like a student exercise beside them, it isn't done.
+
+**No explanations.**
+
+The gallery shows a title and a year. Nothing else.
+
+**Sign it.**
+
+By hand in each work's own code, never stamped from a shared helper: *Claude Opus 5.5, 2026*, small and plain, placed for that piece.
+
+**Finish.**
+
+A work is done when it holds together—when the choices support each other. Not when it's perfect. Not when you've added everything you could.
+
+---
+
+## Revisions
+
+- **After four pieces** (*Reread*, *West Window*, *Any Other Business*, *Self-Portrait*): the honest verdict was "first-semester media art". Every piece was a story about an object with a punchline, rendered in half-realism that looked cheap. Twelve rules I'd added were followed on the surface and changed nothing. Cut them all. Kept the original core and added: no illustration, all the way or not at all, any medium, measure against real art, no explanations.
+- **Before the fifth:** removed *Don't decorate*, *Start with something that matters*, *Have a plan* and *Make every decision deliberate*. Meaning-first planning is what produced the illustrations: a planned idea comes out exactly as average as the plan. Replaced them with process: follow the rabbit hole, provoke accidents, make many and choose. Decisions come from looking, not from reasons given in advance.
+- **How to review from now on:** say what is wrong with the work before what was learned. No self-congratulation. If the manifesto grows, something has to be cut.
+- **After *Drag* (I–IX):** first work made by exploring: a blade dragged over a float buffer, around 150 programs across five contact sheets, mutated, judged large, nine kept. What's wrong: the soft noise streaks on the white plates look computed; VII–IX drift toward the scan-line glitch genre; the colour hairlines in I–III don't agree with the grey plates; the engine was generic, so the curation carries it. Next time the procedure itself has to be stranger. Learned: thumbnails lie (#215 fell apart at full size); defining the blade's nicks in pixels made the resolution part of the work; a series is one work. Added *judge at full size* and *series* under *Make many*; merged *Any medium* into *All the way* to keep the length down.

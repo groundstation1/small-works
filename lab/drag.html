@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>lab · drag</title>
+<script src="drag.js?v=4"></script>
+<style>
+  body { margin: 0; background: #222; color: #999; font: 11px/1.3 ui-monospace, monospace; }
+  .sheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 6px; }
+  .sheet div { text-align: left; }
+  .sheet canvas { width: 100%; image-rendering: pixelated; display: block; cursor: pointer; }
+  .one { display: flex; justify-content: center; align-items: center; height: 100vh; }
+  .one canvas { max-height: 100vh; max-width: 100vw; }
+</style></head><body>
+<script>
+  // ?base=100          16 fresh programs, seeds 100..115
+  // ?chain=104.3       16 mutations of that chain
+  // ?one=104.3&n=900   one, large
+  // ?list=12,108,202m  side by side
+  const q = new URLSearchParams(location.search);
+  if (q.has('kind')) FORCE_KIND = q.get('kind');
+  if (q.has('one')) {
+    document.body.className = 'one';
+    const c = document.createElement('canvas'); document.body.append(c);
+    const N = +q.get('n') || 800;
+    toCanvas(render(fromChain(q.get('one')), N), N, c);
+  } else {
+    const grid = document.createElement('div'); grid.className = 'sheet'; document.body.append(grid);
+    const N = +q.get('n') || 220;
+    const chains = [];
+    if (q.has('chain')) for (let k = 1; k <= 16; k++) chains.push(q.get('chain') + '.' + k);
+    else if (q.has('list')) chains.push(...q.get('list').split(','));
+    else { const b = +q.get('base') || 1; for (let k = 0; k < 16; k++) chains.push(String(b + k)); }
+    for (const ch of chains) {
+      const cell = document.createElement('div'), c = document.createElement('canvas');
+      cell.append(c, ch); grid.append(cell);
+      c.onclick = () => { q.set('chain', ch); q.delete('base'); location.search = q; };
+      toCanvas(render(fromChain(ch), N), N, c);
+    }
+  }
+</script>
+</body></html>

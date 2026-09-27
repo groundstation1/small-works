@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>lab · thumbs</title>
+<script src="../works.js"></script>
+<style>body { margin: 0; background: #222; color: #aaa; font: 12px ui-monospace, monospace; } iframe { width: 1000px; height: 1000px; border: 0; position: absolute; left: -2000px; }</style>
+</head><body><pre id="log"></pre>
+<script>
+  // Renders every view of every work at 1000px, still, and saves it as thumbs/<id>-<n>.jpg.
+  // Needs lab/serve.py. ?only=drag to redo one entry.
+  const only = new URLSearchParams(location.search).get('only');
+  const log = s => document.getElementById('log').textContent += s + '\n';
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  (async () => {
+    for (const w of WORKS) {
+      if (only && w.id !== only) continue;
+      const vs = views(w);
+      for (let k = 0; k < vs.length; k++) {
+        const f = document.createElement('iframe');
+        f.src = '../' + workSrc(vs[k], { still: '' });
+        document.body.append(f);
+        await new Promise(r => f.onload = r);
+        await wait(2500);                                       // let it finish drawing
+        const c = f.contentDocument.querySelector('canvas');
+        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
+        const name = `${w.id}-${k + 1}.jpg`;
+        await fetch('/save?name=' + name, { method: 'POST', body: blob });
+        log(`${name}  ${c.width}×${c.height}  ${(blob.size / 1024).toFixed(0)} KB`);
+        f.remove();
+      }
+    }
+    log('done');
+  })();
+</script></body></html>
