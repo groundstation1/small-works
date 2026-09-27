@@ -6,7 +6,7 @@
 <script>
   // Renders every view of every work at 1000px, still, and saves it as thumbs/<id>-<n>.jpg.
   // Needs lab/serve.py. ?only=drag to redo one entry.
-  const only = new URLSearchParams(location.search).get('only');
+  const only = new URLSearchParams(location.search).get('only'), onlyK = +new URLSearchParams(location.search).get('k') || 0;
   const log = s => document.getElementById('log').textContent += s + '\n';
   const wait = ms => new Promise(r => setTimeout(r, ms));
   (async () => {
@@ -14,6 +14,7 @@
       if (only && w.id !== only) continue;
       const vs = views(w);
       for (let k = 0; k < vs.length; k++) {
+        if (onlyK && k + 1 !== onlyK) continue;                    // ?k=6 : just that plate
         const f = document.createElement('iframe');
         f.src = '../' + workSrc(vs[k], { still: '' });
         document.body.append(f);

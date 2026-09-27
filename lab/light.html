@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>lab · light</title>
+<style>
+  body { margin: 0; background: #111; color: #777; font: 11px/1.3 ui-monospace, monospace; }
+  .sheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px; }
+  .sheet canvas { width: 100%; display: block; cursor: pointer; }
+  .one { display: flex; justify-content: center; align-items: center; height: 100vh; }
+</style></head><body>
+<script>
+  // A white room lit only by coloured tubes, rendered by path tracing: light bouncing, colour bleeding,
+  // soft shadows. Frames accumulate like an exposure.   ?base=1 · ?chain=4 · ?one=4.2&css=700&spp=600
+  function rng(seed) { let a = (seed >>> 0) || 1; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const pick = (R, a) => a[Math.floor(R() * a.length)], range = (R, a, b) => a + (b - a) * R();
+  const TUBES = { pink: [1.0, 0.33, 0.62], yellow: [1.0, 0.82, 0.18], green: [0.32, 1.0, 0.36], blue: [0.22, 0.38, 1.0],
+                  red: [1.0, 0.1, 0.07], daylight: [0.86, 0.93, 1.0], coolwhite: [1.0, 1.0, 0.94], uv: [0.3, 0.06, 0.85] };
+
+  // ---------- programs: rooms and arrangements ----------
+  function program(seed) {
+    const R = rng(seed * 2654435761 + 31);
+    const W = range(R, 4, 8), D = range(R, 4, 8), H = range(R, 2.9, 3.6), w = 0.035;
+    const kind = pick(R, ['corner', 'corner', 'barrier', 'floor', 'frame', 'ceiling', 'corner-diag']);
+    const cols = Object.keys(TUBES), palette = [pick(R, cols), pick(R, cols), pick(R, cols)];
+    const tubes = [], boxes = [];
+    const L = pick(R, [1.22, 2.44]);                                   // Flavin's two lengths: 4 ft and 8 ft
+    if (kind === 'corner' || kind === 'corner-diag') {
+      const n = 1 + Math.floor(R() * 4), cx = W / 2 - 0.08, cz = -D + 0.08;
+      for (let i = 0; i < n; i++) {
+        const y0 = kind === 'corner' ? 0.02 : 0.02 + i * 0.3, len = kind === 'corner' ? L : L;
+        const off = i * 0.07;
+        if (kind === 'corner') tubes.push({ a: [cx - off, y0, cz + off], b: [cx - off, y0 + len, cz + off], c: palette[i % 3] });
+        else tubes.push({ a: [cx - off - 0.05, 0.02, cz + 0.05 + off], b: [cx - off - len * 0.7, len * 0.7, cz + 0.05 + off], c: palette[i % 3] });
+      }
+    } else if (kind === 'barrier') {
+      const n = 3 + Math.floor(R() * 6), z = -range(R, 1.5, D - 1.5), span = Math.min(W - 0.5, n * 0.6);
+      for (let i = 0; i < n; i++) { const x = -span / 2 + span * (n > 1 ? i / (n - 1) : 0.5); tubes.push({ a: [x, 0.02, z], b: [x, L, z], c: palette[i % 2] }); }
+      if (R() < 0.6) boxes.push({ min: [-span / 2 - 0.05, 0, z - 0.06], max: [span / 2 + 0.05, L + 0.02, z - 0.03] });   // the fixtures' backs: a screen
+    } else if (kind === 'floor') {
+      const n = 1 + Math.floor(R() * 3), z = -D + 0.06;
+      for (let i = 0; i < n; i++) tubes.push({ a: [-W / 2 + 0.3 + i * (L + 0.05), 0.04, z], b: [-W / 2 + 0.3 + i * (L + 0.05) + L, 0.04, z], c: palette[i % 3] });
+    } else if (kind === 'frame') {
+      const s = L, x0 = range(R, -W / 2 + 0.3, W / 2 - s - 0.3), y0 = range(R, 0.3, H - s - 0.2), z = -D + 0.06;
+      tubes.push({ a: [x0, y0, z], b: [x0 + s, y0, z], c: palette[0] }, { a: [x0, y0 + s, z], b: [x0 + s, y0 + s, z], c: palette[1] },
+                 { a: [x0, y0, z], b: [x0, y0 + s, z], c: palette[2] }, { a: [x0 + s, y0, z], b: [x0 + s, y0 + s, z], c: palette[0] });
+    } else if (kind === 'ceiling') {
+      const z = -range(R, 1, D - 1);
+      tubes.push({ a: [-W / 2 + 0.02, H - 0.05, z], b: [W / 2 - 0.02, H - 0.05, z], c: palette[0] });
+    }
+    const cam = FIELD ? pick(R, ['into-corner', 'at-wall', 'up', 'along-floor']) : pick(R, ['corner', 'wall', 'wide']);
+    if (FIELD) {                                                     // look at what the light does, not at the lights
+      const views = {
+        'into-corner': [[W / 2 - range(R, 1.2, 2.5), range(R, 0.8, 2.2), -D + range(R, 1.2, 2.5)], [W / 2, range(R, 0.6, 2.4), -D], range(R, 30, 55)],
+        'at-wall': [[range(R, -1, 1), range(R, 0.8, 2), -D + range(R, 1.5, 3)], [range(R, -1, 1), range(R, 0.8, 2), -D], range(R, 25, 45)],
+        'up': [[range(R, -1, 1), 1.2, -D / 2], [range(R, -1, 1), H, -D / 2 - range(R, 0.3, 1.5)], range(R, 45, 70)],
+        'along-floor': [[-W / 2 + 0.5, 0.35, -0.5], [W / 2, 0.05, -D + 0.3], range(R, 35, 55)],
+      };
+      const [eye, look, fov] = views[cam];
+      return { W, D, H, w, tubes, boxes, eye, look, fov, power: range(R, 14, 40), albedo: range(R, 0.72, 0.86), kind: kind + '/' + cam, seed };
+    }
+    const eye = cam === 'corner' ? [range(R, -W / 2 + 0.8, 0), 1.55, -range(R, 0.3, 1.2)] : cam === 'wall' ? [range(R, -0.5, 0.5), 1.55, -0.3] : [-W / 2 + 0.4, 1.7, -0.3];
+    const look = cam === 'corner' ? [W / 2, range(R, 0.8, 1.6), -D] : cam === 'wall' ? [range(R, -0.5, 0.5), 1.4, -D] : [W / 2 - 1, 1.2, -D + 1];
+    return { W, D, H, w, tubes, boxes, eye, look, fov: range(R, 45, 70), power: range(R, 14, 40), albedo: range(R, 0.72, 0.86), kind, seed };
+  }
+  function mutate(p0, m) {
+    const R = rng(m * 7919 + 13), p = JSON.parse(JSON.stringify(p0)), w = R(), cols = Object.keys(TUBES);
+    if (w < 0.35) { const t = pick(R, p.tubes); if (t) t.c = pick(R, cols); }
+    else if (w < 0.5) p.power *= range(R, 0.5, 2);
+    else if (w < 0.65) { p.eye[0] += range(R, -1, 1); p.eye[2] = Math.min(-0.2, p.eye[2] + range(R, -1, 1)); }
+    else if (w < 0.75) p.fov = range(R, 35, 80);
+    else if (w < 0.85) p.look[1] = range(R, 0.3, 2.5);
+    else { const q = program(Math.floor(R() * 1e6)); p.tubes = q.tubes; p.boxes = q.boxes; p.kind = q.kind; }
+    return p;
+  }
+  const fromChain = c => { const [s, ...ms] = String(c).split('.').map(Number); return ms.reduce(mutate, program(s)); };
+
+  // ---------- the tracer ----------
+  const VS = `#version 300 es
+  in vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }`;
+  const FS = `#version 300 es
+  precision highp float;
+  uniform sampler2D uPrev; uniform vec2 uRes; uniform int uFrame;
+  uniform vec3 uRoom; uniform vec3 uEye; uniform vec3 uLook; uniform float uFov; uniform float uAlbedo; uniform float uPower;
+  uniform int uNT; uniform vec3 uTA[12]; uniform vec3 uTB[12]; uniform vec3 uTC[12]; uniform float uTW;
+  uniform int uNB; uniform vec3 uBMin[4]; uniform vec3 uBMax[4];
+  out vec4 o;
+  uint st;
+  float rnd(){ st = st * 747796405u + 2891336453u; uint w = ((st >> ((st >> 28u) + 4u)) ^ st) * 277803737u; return float((w >> 22u) ^ w) / 4294967295.; }
+  // a tube as a capsule-ish thin box around segment a-b
+  bool hitBox(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax, out float t, out vec3 n){
+    t = 1e9; n = vec3(0);                                             // always assigned: D3D rejects out params left unset
+    vec3 inv = 1. / rd, t0 = (bmin - ro) * inv, t1 = (bmax - ro) * inv, tmin = min(t0, t1), tmax = max(t0, t1);
+    float tn = max(max(tmin.x, tmin.y), tmin.z), tf = min(min(tmax.x, tmax.y), tmax.z);
+    if (tn > tf || tf < 1e-4) return false;
+    t = tn > 1e-4 ? tn : tf;
+    vec3 hp = ro + rd * t, c = (bmin + bmax) * .5, e = (bmax - bmin) * .5, d = (hp - c) / e, ad = abs(d);
+    if (ad.x > ad.y && ad.x > ad.z) n = vec3(sign(d.x), 0., 0.);     // plain ifs: nested ?: on vec3 breaks the D3D translation
+    else if (ad.y > ad.z) n = vec3(0., sign(d.y), 0.);
+    else n = vec3(0., 0., sign(d.z));
+    return true;
+  }
+  void tubeBox(int i, out vec3 mn, out vec3 mx){ vec3 a = uTA[i], b = uTB[i]; mn = min(a, b) - vec3(uTW * .5); mx = max(a, b) + vec3(uTW * .5); }
+  // scene: returns t, normal, kind (0 wall, 1 floor, 2 box, 3+i tube)
+  float scene(vec3 ro, vec3 rd, out vec3 n, out int kind){
+    vec3 bmin = vec3(-uRoom.x * .5, 0., -uRoom.z), bmax = vec3(uRoom.x * .5, uRoom.y, 0.);
+    vec3 inv = 1. / rd, t0 = (bmin - ro) * inv, t1 = (bmax - ro) * inv, tmax = max(t0, t1);
+    float t = min(min(tmax.x, tmax.y), tmax.z);
+    if (t == tmax.x) n = vec3(-sign(rd.x), 0., 0.);
+    else if (t == tmax.y) n = vec3(0., -sign(rd.y), 0.);
+    else n = vec3(0., 0., -sign(rd.z));
+    kind = 0; if (n.y > .5) kind = 1;
+    float tt = 0.; vec3 nn = vec3(0);
+    for (int i = 0; i < 4; i++) { if (i >= uNB) break; if (hitBox(ro, rd, uBMin[i], uBMax[i], tt, nn) && tt < t) { t = tt; n = nn; kind = 2; } }
+    for (int i = 0; i < 12; i++) { if (i >= uNT) break; vec3 mn, mx; tubeBox(i, mn, mx); if (hitBox(ro, rd, mn, mx, tt, nn) && tt < t) { t = tt; n = nn; kind = 3 + i; } }
+    return t;
+  }
+  vec3 cosDir(vec3 n){ float a = 6.2831853 * rnd(), r = sqrt(rnd()); vec3 u = normalize(abs(n.x) > .5 ? cross(n, vec3(0,1,0)) : cross(n, vec3(1,0,0))), v = cross(n, u); return normalize(u * cos(a) * r + v * sin(a) * r + n * sqrt(1. - r * r)); }
+  void main(){
+    st = uint(gl_FragCoord.x) * 1973u + uint(gl_FragCoord.y) * 9277u + uint(uFrame) * 26699u | 1u;
+    vec2 uv = (gl_FragCoord.xy + vec2(rnd(), rnd()) - uRes * .5) / uRes.y;
+    vec3 f = normalize(uLook - uEye), r = normalize(cross(f, vec3(0, 1, 0))), u = cross(r, f);
+    float k = tan(radians(uFov) * .5) * 2.;
+    vec3 ro = uEye, rd = normalize(f + (r * uv.x + u * uv.y) * k);
+    vec3 acc = vec3(0), thr = vec3(1);
+    for (int b = 0; b < 4; b++) {
+      vec3 n; int kind; float t = scene(ro, rd, n, kind);
+      if (kind >= 3) { if (b == 0) acc += thr * uTC[kind - 3] * uPower * .12; break; }   // looking at a tube: bright, not blinding
+      vec3 x = ro + rd * t + n * 1e-4;
+      float alb = kind == 1 ? uAlbedo * .8 : kind == 2 ? .08 : uAlbedo;
+      // direct light: one tube, one point on it
+      if (uNT > 0) {
+        int i = int(rnd() * float(uNT)); i = min(i, uNT - 1);
+        vec3 a = uTA[i], bb = uTB[i], p = mix(a, bb, rnd()), axis = bb - a; float len = length(axis); axis /= max(len, 1e-4);
+        vec3 L = p - x; float d = length(L); L /= d;
+        float cs = dot(n, L);
+        if (cs > 0.) {
+          vec3 sn; int sk; float st2 = scene(x, L, sn, sk);
+          if (sk == 3 + i || st2 > d - uTW) {
+            float ca = dot(axis, L); float proj = len * uTW * sqrt(max(0., 1. - ca * ca)) + uTW * uTW;   // pow() of a negative is NaN in GLSL
+            acc += thr * (alb / 3.14159) * uTC[i] * uPower * cs * proj / (d * d) * float(uNT);
+          }
+        }
+      }
+      thr *= alb;
+      if (b > 2) { float q = max(thr.r, max(thr.g, thr.b)); if (rnd() > q) break; thr /= q; }
+      ro = x; rd = cosDir(n);
+    }
+    float lum = dot(acc, vec3(.3, .6, .1)); if (lum > 6.) acc *= 6. / lum;   // clamp fireflies: rare paths that would speckle for minutes
+    vec4 prev = texelFetch(uPrev, ivec2(gl_FragCoord.xy), 0);
+    o = prev + vec4(acc, 1.);
+  }`;
+  const SHOW = `#version 300 es
+  precision highp float; uniform sampler2D uAcc; uniform float uExposure; out vec4 o;
+  vec3 aces(vec3 x){ return clamp((x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14), 0., 1.); }
+  void main(){ vec4 a = texelFetch(uAcc, ivec2(gl_FragCoord.xy), 0); vec3 c = aces(a.rgb / max(a.a, 1.) * uExposure); o = vec4(pow(c, vec3(1. / 2.2)), 1.); }`;
+
+  function tracer(size) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = size;
+    const gl = cv.getContext('webgl2', { preserveDrawingBuffer: true, antialias: false });
+    gl.getExtension('EXT_color_buffer_float');
+    const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(x); return x; };
+    const prog = (fs) => { const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); return p; };
+    const P = prog(FS), S = prog(SHOW);
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const tex = [0, 1].map(() => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, size, size, 0, gl.RGBA, gl.FLOAT, null); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); return t; });
+    const fb = tex.map(t => { const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); return f; });
+    const attrib = p => { const l = gl.getAttribLocation(p, 'p'); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, 2, gl.FLOAT, false, 0, 0); };
+    let cur = 0, frame = 0, scene = null;
+    return {
+      canvas: cv,
+      load(p) {
+        scene = p; frame = 0;
+        for (const f of fb) { gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+      },
+      step(n = 1) {
+        const p = scene; gl.useProgram(P); attrib(P); gl.viewport(0, 0, size, size);
+        const U = (name) => gl.getUniformLocation(P, name);
+        gl.uniform2f(U('uRes'), size, size); gl.uniform3f(U('uRoom'), p.W, p.H, p.D); gl.uniform3fv(U('uEye'), p.eye); gl.uniform3fv(U('uLook'), p.look);
+        gl.uniform1f(U('uFov'), p.fov); gl.uniform1f(U('uAlbedo'), p.albedo); gl.uniform1f(U('uPower'), p.power); gl.uniform1f(U('uTW'), p.w);
+        gl.uniform1i(U('uNT'), p.tubes.length); gl.uniform1i(U('uNB'), p.boxes.length);
+        const flat = (arr, key) => new Float32Array(Array.from({ length: 12 }, (_, i) => arr[i] ? arr[i][key] : [0, 0, 0]).flat());
+        gl.uniform3fv(U('uTA'), flat(p.tubes, 'a')); gl.uniform3fv(U('uTB'), flat(p.tubes, 'b'));
+        gl.uniform3fv(U('uTC'), new Float32Array(Array.from({ length: 12 }, (_, i) => p.tubes[i] ? TUBES[p.tubes[i].c] : [0, 0, 0]).flat()));
+        gl.uniform3fv(U('uBMin'), new Float32Array(Array.from({ length: 4 }, (_, i) => p.boxes[i] ? p.boxes[i].min : [0, 0, 0]).flat()));
+        gl.uniform3fv(U('uBMax'), new Float32Array(Array.from({ length: 4 }, (_, i) => p.boxes[i] ? p.boxes[i].max : [0, 0, 0]).flat()));
+        for (let i = 0; i < n; i++) {
+          gl.uniform1i(U('uFrame'), frame++);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fb[1 - cur]); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex[cur]); gl.uniform1i(U('uPrev'), 0);
+          gl.drawArrays(gl.TRIANGLES, 0, 3); cur = 1 - cur;
+        }
+      },
+      show(exposure = 1) {
+        gl.useProgram(S); attrib(S); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, size, size);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex[cur]); gl.uniform1i(gl.getUniformLocation(S, 'uAcc'), 0);
+        gl.uniform1f(gl.getUniformLocation(S, 'uExposure'), exposure); gl.drawArrays(gl.TRIANGLES, 0, 3);
+      },
+      get frame() { return frame; },
+    };
+  }
+
+  const q = new URLSearchParams(location.search), FIELD = q.get('v') === '2';
+  (async () => {
+    const wait = () => new Promise(r => setTimeout(r, 0));
+    if (q.has('one')) {
+      document.body.className = 'one';
+      const css = +q.get('css') || 700, T = tracer(Math.round(css * devicePixelRatio));
+      T.canvas.style.width = css + 'px'; document.body.append(T.canvas);
+      T.load(fromChain(q.get('one')));
+      const spp = +q.get('spp') || 800;
+      const loop = () => { T.step(4); T.show(); if (T.frame < spp) requestAnimationFrame(loop); else document.title = 'done'; };
+      loop();
+    } else {
+      const grid = document.createElement('div'); grid.className = 'sheet'; document.body.append(grid);
+      const b = +q.get('base') || 1, chain = q.get('chain'), list = q.get('list') && q.get('list').split(','), size = 240, T = tracer(size);
+      for (let k = 0; k < (list ? list.length : 16); k++) {
+        const name = list ? list[k] : chain ? chain + '.' + (k + 1) : String(b + k), p = fromChain(name);
+        const cell = document.createElement('div'), c = document.createElement('canvas'); c.width = c.height = size;
+        cell.append(c, `${name} ${p.kind} ${p.tubes.map(t => t.c).join('/')}`); grid.append(cell);
+        c.onclick = () => { const u = new URLSearchParams(q); u.set('chain', name); u.delete('base'); u.delete('list'); location.search = u; };
+        T.load(p); for (let i = 0; i < 12; i++) { T.step(8); await wait(); }
+        T.show(); c.getContext('2d').drawImage(T.canvas, 0, 0);
+      }
+      document.title = 'done';
+    }
+  })();
+</script></body></html>
