@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>lab · found</title>
+<style>
+  body { margin: 0; background: #ddd; color: #666; font: 11px/1.3 ui-monospace, monospace; }
+  .sheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px; }
+  .sheet canvas { width: 100%; display: block; cursor: pointer; }
+  .one { display: flex; justify-content: center; align-items: center; height: 100vh; }
+</style></head><body>
+<script>
+  // Found shapes, after Kelly: a fragment of a letter from the fonts on this machine, magnified
+  // until it's only an edge, in two flat colours.   ?base=1 · ?chain=5 · ?one=5.2&css=700 · ?list=..
+  function rng(seed) { let a = (seed >>> 0) || 1; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const pick = (R, a) => a[Math.floor(R() * a.length)];
+  const FONTS = ['Georgia', 'Times New Roman', 'Arial', 'Segoe UI', 'Courier New', 'Impact', 'Trebuchet MS', 'Palatino Linotype', 'Consolas', 'Verdana', 'Garamond', 'Bodoni MT', 'Gill Sans MT', 'Rockwell', 'Century Gothic', 'serif', 'sans-serif'];
+  const GLYPHS = 'aegsQRSGBJKRy&@§¶ß%23589?!*()[]{}ÆŒøå'.split('');
+  const COLOURS = { red: '#d42a20', blue: '#1d3f96', yellow: '#f3c300', green: '#1f7a4a', black: '#141414', white: '#f4f1ea', orange: '#ec6a1c', pink: '#e8a6b8', sky: '#7fb3d9', ochre: '#c89a3a' };
+  const PAIRS = [['red', 'white'], ['blue', 'white'], ['black', 'white'], ['yellow', 'black'], ['green', 'white'], ['red', 'blue'], ['orange', 'white'], ['blue', 'yellow'], ['black', 'red'], ['pink', 'red'], ['sky', 'white'], ['ochre', 'black'], ['green', 'blue'], ['white', 'black']];
+
+  function program(seed) {
+    const R = rng(seed * 2654435761 + 17);
+    return { font: pick(R, FONTS), glyph: pick(R, GLYPHS), weight: pick(R, ['normal', 'normal', 'bold']), italic: R() < 0.2,
+             zoom: pick(R, [2, 4, 8, 16, 32]), rot: pick(R, [0, 0, 0, 90, 180, 270]), pair: pick(R, PAIRS), flip: R() < 0.5, pt: R(), pseed: Math.floor(R() * 1e9) };
+  }
+  function mutate(p0, m) {
+    const R = rng(m * 7717 + 3), p = { ...p0 };
+    const w = R();
+    if (w < 0.25) p.pt = R();                                        // another point on the same edge
+    else if (w < 0.45) p.zoom = pick(R, [1.5, 2, 3, 4, 6, 8, 16, 32]);
+    else if (w < 0.6) p.pair = pick(R, PAIRS);
+    else if (w < 0.7) p.rot = pick(R, [0, 90, 180, 270]);
+    else if (w < 0.8) p.flip = !p.flip;
+    else if (w < 0.9) p.glyph = pick(R, GLYPHS);
+    else p.font = pick(R, FONTS);
+    return p;
+  }
+  const fromChain = c => { const [s, ...ms] = String(c).split('.').map(Number); return ms.reduce(mutate, program(s)); };
+
+  // find the glyph's edge at a working size, pick a point on it, then draw the real vector glyph magnified there
+  function draw(p, N, canvas) {
+    const S = 512, work = document.createElement('canvas'); work.width = work.height = S;
+    const w = work.getContext('2d'), font = `${p.italic ? 'italic ' : ''}${p.weight} ${S * 0.7}px "${p.font}"`;
+    w.font = font; w.textAlign = 'center'; w.textBaseline = 'middle'; w.fillText(p.glyph, S / 2, S / 2);
+    const a = w.getImageData(0, 0, S, S).data, edges = [];
+    for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+      const i = (y * S + x) * 4 + 3, on = a[i] > 127;
+      if (on !== (a[i + 4] > 127) || on !== (a[i + S * 4] > 127)) edges.push([x, y]);
+    }
+    canvas.width = canvas.height = N;
+    const c = canvas.getContext('2d'), [bgName, fgName] = p.flip ? [p.pair[1], p.pair[0]] : p.pair;
+    c.fillStyle = COLOURS[bgName]; c.fillRect(0, 0, N, N);
+    if (!edges.length) return 0;
+    const [ex, ey] = edges[Math.floor(p.pt * edges.length)];
+    const k = (N / S) * p.zoom;
+    c.save();
+    c.translate(N / 2, N / 2); c.rotate(p.rot * Math.PI / 180); c.scale(k, k); c.translate(-ex, -ey);
+    c.font = font; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = COLOURS[fgName];
+    c.fillText(p.glyph, S / 2, S / 2);
+    c.restore();
+    const d = c.getImageData(0, 0, N, N).data, bg = d.slice(0, 3); let n = 0;   // how much of the square the shape takes
+    for (let i = 0; i < d.length; i += 64) if (d[i] !== bg[0] || d[i + 1] !== bg[1] || d[i + 2] !== bg[2]) n++;
+    return n / (d.length / 64);
+  }
+
+  // the walk: trace the glyph's outline (Moore neighbour tracing on a big mask), then move the
+  // magnified window along it, drawing the real vector glyph every frame
+  function outline(p, S) {
+    const work = document.createElement('canvas'); work.width = work.height = S;
+    const w = work.getContext('2d'), font = `${p.italic ? 'italic ' : ''}${p.weight} ${S * 0.7}px "${p.font}"`;
+    w.font = font; w.textAlign = 'center'; w.textBaseline = 'middle'; w.fillText(p.glyph, S / 2, S / 2);
+    const a = w.getImageData(0, 0, S, S).data, on = (x, y) => x >= 0 && y >= 0 && x < S && y < S && a[(y * S + x) * 4 + 3] > 127;
+    let sx = -1, sy = -1;
+    for (let y = 0; y < S && sx < 0; y++) for (let x = 0; x < S; x++) if (on(x, y)) { sx = x; sy = y; break; }
+    const N8 = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]], path = [];
+    let x = sx, y = sy, dir = 7, guard = 0;
+    do {
+      path.push([x, y]);
+      let found = false;
+      for (let i = 0; i < 8; i++) { const d = (dir + 6 + i) % 8, nx = x + N8[d][0], ny = y + N8[d][1]; if (on(nx, ny)) { x = nx; y = ny; dir = d; found = true; break; } }
+      if (!found) break;
+    } while ((x !== sx || y !== sy) && ++guard < S * 40);
+    const sm = [], K = 12;                                           // smooth it, so the window glides
+    for (let i = 0; i < path.length; i++) { let mx = 0, my = 0; for (let j = -K; j <= K; j++) { const [px, py] = path[(i + j + path.length) % path.length]; mx += px; my += py; } sm.push([mx / (2 * K + 1), my / (2 * K + 1)]); }
+    return { path: sm, font, S };
+  }
+  function frame(p, o, t, N, c) {
+    const P = o.path, i = Math.floor(t) % P.length, f = t - Math.floor(t), [x0, y0] = P[i], [x1, y1] = P[(i + 1) % P.length];
+    const ex = x0 + (x1 - x0) * f, ey = y0 + (y1 - y0) * f;
+    const [bgName, fgName] = p.flip ? [p.pair[1], p.pair[0]] : p.pair, k = (N / o.S) * p.zoom;
+    c.fillStyle = COLOURS[bgName]; c.fillRect(0, 0, N, N);
+    c.save(); c.translate(N / 2, N / 2); c.rotate(p.rot * Math.PI / 180); c.scale(k, k); c.translate(-ex, -ey);
+    c.font = o.font; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = COLOURS[fgName]; c.fillText(p.glyph, o.S / 2, o.S / 2);
+    c.restore();
+  }
+
+  const q = new URLSearchParams(location.search);
+  if (q.has('walk')) {
+    document.body.className = 'one';
+    const cv = document.createElement('canvas'), css = +q.get('css') || 700, N = Math.round(css * devicePixelRatio);
+    cv.width = cv.height = N; cv.style.width = css + 'px'; document.body.append(cv);
+    const p = fromChain(q.get('walk')), o = outline(p, 1024), c = cv.getContext('2d');
+    if (q.has('zoom')) p.zoom = +q.get('zoom');
+    window.sheet8 = () => {                                           // eight frames along the walk, for looking
+      const box = document.createElement('div'); box.style.cssText = 'position:fixed;inset:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:6px;background:#ddd;z-index:9';
+      for (let i = 0; i < 8; i++) { walk.t = o.path.length * i / 8; const s = document.createElement('canvas'); s.width = s.height = 300; s.getContext('2d').drawImage(cv, 0, 0, 300, 300); s.style.width = '100%'; box.append(s); }
+      document.body.append(box);
+    };
+    const speed = +q.get('speed') || 0.6;                            // outline pixels per frame
+    let t = (q.has('at') ? +q.get('at') : p.pt) * o.path.length;
+    window.walk = { len: o.path.length, get t() { return t; }, set t(v) { t = v; frame(p, o, t, N, c); } };
+    const loop = () => { t += speed; frame(p, o, t, N, c); if (!q.has('hold')) requestAnimationFrame(loop); };
+    loop();
+  } else if (q.has('one')) {
+    document.body.className = 'one';
+    const c = document.createElement('canvas'), css = +q.get('css') || 700; document.body.append(c);
+    draw(fromChain(q.get('one')), Math.round(css * devicePixelRatio), c); c.style.width = css + 'px';
+  } else {
+    const grid = document.createElement('div'); grid.className = 'sheet'; document.body.append(grid);
+    const chain = q.get('chain'), list = q.get('list') && q.get('list').split(',');
+    let s = +q.get('base') || 1, made = 0;
+    while (made < 16 && s < 10000) {
+      const name = list ? list[made] : chain ? chain + '.' + (made + 1) : String(s++);
+      if (list && made >= list.length) break;
+      const p = fromChain(name), c = document.createElement('canvas');
+      if (q.has('minzoom') && !chain && !list) p.zoom = Math.max(p.zoom, +q.get('minzoom')) * (1 + Math.floor(rng(s)() * 3));
+      const frac = draw(p, 400, c);
+      if (!list && !chain && (frac < 0.1 || frac > 0.9)) continue;   // nearly one colour: not a shape yet
+      const cell = document.createElement('div'); cell.append(c, `${name} ${p.glyph} ${p.font} ×${p.zoom}`); grid.append(cell);
+      c.onclick = () => { const u = new URLSearchParams(q); u.set('chain', name); u.delete('base'); u.delete('list'); location.search = u; };
+      made++;
+    }
+  }
+</script></body></html>

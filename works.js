@@ -54,6 +54,15 @@ window.WORKS = [
     plates: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'],
     cover: 2,
   },
+  {
+    id: 'found',
+    title: 'Found',
+    year: 2026,
+    ground: '#141414',
+    grounds: ['#141414', '#1d3f96', '#1d3f96', '#f4f1ea', '#7fb3d9', '#d42a20'],
+    plates: ['I', 'II', 'III', 'IV', 'V', 'VI'],
+    cover: 1,
+  },
 ];
 
 // Every entry is a list of views: one for a single work, several for a series.
