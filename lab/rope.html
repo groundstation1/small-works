@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>lab · rope</title>
+<style>
+  body { margin: 0; background: #bbb; color: #555; font: 11px/1.3 ui-monospace, monospace; }
+  .sheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px; }
+  .sheet canvas { width: 100%; display: block; cursor: pointer; }
+  .one { display: flex; justify-content: center; align-items: center; height: 100vh; }
+</style></head><body>
+<script>
+  // A falling viscous thread, laid down by a moving hand. The geometric model of Brun, Audoly, Ribe,
+  // Eaves & Lister (PRL 2015): in arclength s (unit = coil radius), contact point (r, ψ) from below the
+  // nozzle, laid tangent θ, canvas moving under the nozzle at speed V in direction φ:
+  //   r' = cos(θ-ψ) + V cos(ψ-φ),  r ψ' = sin(θ-ψ) - V sin(ψ-φ),  θ' = κ(r, θ-ψ)
+  //   κ = √r (1 + A r) sin(θ-ψ),  A = b² cos(θ-ψ) / (1 - b cos(θ-ψ)),  b = 0.715
+  // The laid trace on the canvas has tangent θ. The hand is the gesture; the thread draws.
+  //   ?base=1 · ?chain=4 · ?one=4.2&css=800 · ?list=..
+  function rng(seed) { let a = (seed >>> 0) || 1; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const pick = (R, a) => a[Math.floor(R() * a.length)], range = (R, a, b) => a + (b - a) * R();
+  const B = 0.715;
+  const kappa = (r, d) => { const c = Math.cos(d), A = B * B * c / (1 - B * c); return Math.sqrt(Math.max(r, 0)) * (1 + A * r) * Math.sin(d); };
+
+  const PALETTES = {
+    pollock: { ground: '#d8ccb4', inks: ['#141210', '#f1ece2', '#8a8f93', '#b27b3a'] },
+    ink: { ground: '#f2efe8', inks: ['#111111'] },
+    chalk: { ground: '#3b3e3f', inks: ['#e9e6de'] },
+    blue: { ground: '#f2efe8', inks: ['#1b2f7a', '#111111'] },
+    red: { ground: '#eee8dc', inks: ['#b3261e', '#111111', '#eee8dc'] },
+    night: { ground: '#101214', inks: ['#e9e6de', '#c9a34a', '#7c8a96'] },
+  };
+
+  function program(seed) {
+    const R = rng(seed * 2654435761 + 23);
+    const pal = pick(R, Object.keys(PALETTES));
+    const n = 1 + Math.floor(R() * (R() < 0.5 ? 4 : 14));
+    const kind = pick(R, ['pass', 'pass', 'arc', 'wander', 'rows', 'columns']);
+    return {
+      pal, kind, n, seed: Math.floor(R() * 1e9),
+      coil: range(R, 0.006, 0.04),          // coil radius, as a fraction of the canvas
+      width: range(R, 0.0008, 0.005),       // thread width, as a fraction of the canvas
+      vBase: range(R, 0.05, 0.9), vVar: range(R, 0, 0.7), vFreq: range(R, 0.3, 4),
+    };
+  }
+  function mutate(p0, m) {
+    const R = rng(m * 7919 + 5), p = { ...p0 }, w = R();
+    if (w < 0.15) p.pal = pick(R, Object.keys(PALETTES));
+    else if (w < 0.3) p.coil *= range(R, 0.5, 2);
+    else if (w < 0.45) p.width *= range(R, 0.5, 2);
+    else if (w < 0.6) p.vBase = Math.min(1.1, Math.max(0.02, p.vBase + range(R, -0.25, 0.25)));
+    else if (w < 0.72) p.vVar = range(R, 0, 0.8);
+    else if (w < 0.82) p.n = Math.min(80, Math.max(1, Math.round(p.n * range(R, 1, 4))));   // denser, mostly
+    else if (w < 0.9) p.kind = pick(R, ['pass', 'arc', 'wander', 'rows', 'columns']);
+    else p.seed = Math.floor(R() * 1e9);
+    return p;
+  }
+  const fromChain = c => { const [s, ...ms] = String(c).split('.').map(Number); const V2 = new URLSearchParams(location.search).get('v') === '2'; return ms.reduce(V2 ? mutate2 : mutate, V2 ? program2(s) : program(s)); };
+  function mutate2(p0, m) { const R = rng(m * 7919 + 5), p = { ...p0 }, w = R();
+    if (w < 0.2) p.coil *= range(R, 0.5, 2); else if (w < 0.35) p.width *= range(R, 0.6, 1.8); else if (w < 0.5) p.heavy = Math.floor(range(R, 0, 6)); else if (w < 0.65) p.medium = Math.floor(range(R, 2, 24)); else if (w < 0.8) p.fine = Math.floor(range(R, 0, 80)); else if (w < 0.88) p.order = pick(R, ['heavy-first', 'fine-first', 'mixed']); else if (w < 0.94) p.pal = pick(R, Object.keys(PALETTES)); else p.seed = Math.floor(R() * 1e9);
+    return p; }
+
+  // the hand: a path across the canvas (points in 0..1), with a speed profile V along it
+  function gesture(R, kind, i, n) {
+    const pts = [];
+    if (kind === 'pass' || kind === 'arc') {
+      const a = range(R, 0, Math.PI * 2), c = [range(R, 0.05, 0.95), range(R, 0.05, 0.95)], len = range(R, 0.5, 1.4), bend = kind === 'arc' ? range(R, -2.5, 2.5) : range(R, -0.3, 0.3);
+      for (let t = 0; t <= 1; t += 0.01) { const aa = a + bend * (t - 0.5); pts.push([c[0] + Math.cos(aa) * (t - 0.5) * len + Math.cos(a + 1.57) * bend * 0.08 * (t - 0.5) ** 2, c[1] + Math.sin(aa) * (t - 0.5) * len]); }
+    } else if (kind === 'wander') {
+      let x = R(), y = R(), a = R() * 6.28;
+      for (let t = 0; t < 140; t++) { a += range(R, -0.35, 0.35); x += Math.cos(a) * 0.012; y += Math.sin(a) * 0.012; pts.push([x, y]); }
+    } else if (kind === 'rows') {
+      const y = 0.08 + 0.84 * (n > 1 ? i / (n - 1) : 0.5) + range(R, -0.02, 0.02), dir = i % 2 ? -1 : 1;
+      for (let t = 0; t <= 1; t += 0.01) pts.push([0.5 + dir * (t - 0.5) * 0.95, y + Math.sin(t * 6 + i) * 0.01]);
+    } else if (kind === 'columns') {
+      const x = 0.1 + 0.8 * (n > 1 ? i / (n - 1) : 0.5) + range(R, -0.02, 0.02);
+      for (let t = 0; t <= 1; t += 0.01) pts.push([x + Math.sin(t * 5 + i) * 0.015, 0.03 + t * 0.94]);
+    }
+    return pts;
+  }
+
+  // one pour: the hand travels its path; the thread's contact point lags, coils, meanders
+  function pour(ctx, N, p, R, hand, ink) {
+    const unit = p.coil * N, step = 0.05;                            // arclength step, in coil radii
+    const P = hand.map(([x, y]) => [x * N, y * N]), cum = [0];
+    for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+    const total = cum[cum.length - 1];
+    let r = 1, psi = R() * 6.283, theta = psi + Math.PI / 2, u = 0, seg = 0;
+    const phase = R() * 10;
+    let px = P[0][0] + r * Math.cos(psi) * unit, py = P[0][1] + r * Math.sin(psi) * unit;
+    const w0 = Math.max(0.6, p.width * N) * range(R, 0.7, 1.4), fill = range(R, 0.6, 1);   // how full the can is
+    ctx.strokeStyle = ink; ctx.fillStyle = ink; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.arc(px, py, w0 * range(R, 0.8, 2.2), 0, 7); ctx.fill();               // where it first lands, it pools
+    ctx.lineWidth = w0; ctx.beginPath(); ctx.moveTo(px, py);
+    let chunk = 0;
+    for (let guard = 0; u < total && guard < 150000; guard++) {
+      while (seg < P.length - 2 && cum[seg + 1] < u) seg++;
+      const dx = P[seg + 1][0] - P[seg][0], dy = P[seg + 1][1] - P[seg][1];
+      const phi = Math.atan2(-dy, -dx);                              // under the nozzle the canvas moves opposite to the hand
+      const V = Math.max(0.02, p.vBase + p.vVar * Math.sin(phase + (u / total) * p.vFreq * 6.283));
+      const f = (r, psi, th) => { const d = th - psi; return [Math.cos(d) + V * Math.cos(psi - phi), (Math.sin(d) - V * Math.sin(psi - phi)) / Math.max(r, 0.02), kappa(r, d)]; };
+      const k1 = f(r, psi, theta), k2 = f(r + k1[0] * step / 2, psi + k1[1] * step / 2, theta + k1[2] * step / 2);
+      r = Math.max(0.01, r + k2[0] * step); psi += k2[1] * step; theta += k2[2] * step;
+      px += Math.cos(theta) * step * unit; py += Math.sin(theta) * step * unit;
+      ctx.lineTo(px, py);
+      if (++chunk % 12 === 0) {                                      // the can empties: the thread thins
+        ctx.stroke(); const left = Math.max(0, 1 - u / (total * fill));
+        ctx.lineWidth = Math.max(0.35, w0 * (0.25 + 0.75 * left)); ctx.beginPath(); ctx.moveTo(px, py);
+        if (left <= 0 && R() < 0.02) break;
+      }
+      u += V * step * unit;                                          // the hand advances at V (in coil-speed units)
+    }
+    ctx.stroke();
+  }
+
+  // v2, the body: a hand swinging back and forth like a pendulum, drifting as the painter walks.
+  // The hand is a trajectory in time; its real velocity (in coil-speeds) is the model's V and direction.
+  function swing(R, N, unit) {
+    const c0 = [range(R, -0.1, 1.1) * N, range(R, -0.1, 1.1) * N], walk = range(R, 0, 6.283), drift = range(R, 0.02, 0.25) * N;
+    const axis0 = range(R, 0, Math.PI), turn = range(R, -0.6, 0.6), A = range(R, 0.15, 0.55) * N;
+    const vmax = range(R, 0.9, 2.4), omega = vmax / A;               // V = |dH/dt| in thread lengths: peak speed = A·ω     // mid-swing the hand outruns the coiling: straight lines
+    const swings = range(R, 3, 14), T = swings * Math.PI / omega;
+    const wob = range(R, 0, 0.25);
+    const H = t => { const k = t / T, ax = axis0 + turn * k, s = Math.sin(omega * t), w = Math.sin(omega * t * 2 + 1) * wob;
+      return [c0[0] + Math.cos(walk) * drift * k + Math.cos(ax) * A * s - Math.sin(ax) * A * w,
+              c0[1] + Math.sin(walk) * drift * k + Math.sin(ax) * A * s + Math.cos(ax) * A * w]; };
+    return { H, T };
+  }
+  function pourSwing(ctx, N, p, R, ink, weight) {
+    const unit = p.coil * N, step = 0.05, { H, T } = swing(R, N, unit);
+    let r = 1, psi = R() * 6.283, theta = psi + Math.PI / 2, t = 0;
+    let [hx, hy] = H(0), px = hx + Math.cos(psi) * unit, py = hy + Math.sin(psi) * unit;
+    const w0 = Math.max(0.4, p.width * N * weight), fill = range(R, 0.7, 1);
+    ctx.strokeStyle = ink; ctx.fillStyle = ink; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (R() < 0.5) for (let k = 0; k < 3 + R() * 5; k++) {           // where it lands it splashes a little, never a neat dot
+      const a = R() * 6.283, d = w0 * range(R, 0, 2.2);
+      ctx.beginPath(); ctx.arc(px + Math.cos(a) * d, py + Math.sin(a) * d, w0 * range(R, 0.3, 1.1), 0, 7); ctx.fill();
+    }
+    ctx.lineWidth = w0; ctx.beginPath(); ctx.moveTo(px, py);
+    for (let i = 1; t < T && i < 400000; i++) {
+      const dt = step * unit;                                       // time for the thread to lay one step (unit speed)
+      const [nx, ny] = H(t + dt), vx = (nx - hx) / dt, vy = (ny - hy) / dt;
+      const V = Math.hypot(vx, vy), phi = Math.atan2(-vy, -vx);
+      const f = (r, psi, th) => { const d = th - psi; return [Math.cos(d) + V * Math.cos(psi - phi), (Math.sin(d) - V * Math.sin(psi - phi)) / Math.max(r, 0.02), kappa(r, d)]; };
+      const k1 = f(r, psi, theta), k2 = f(r + k1[0] * step / 2, psi + k1[1] * step / 2, theta + k1[2] * step / 2);
+      r = Math.max(0.01, r + k2[0] * step); psi += k2[1] * step; theta += k2[2] * step;
+      px += Math.cos(theta) * step * unit; py += Math.sin(theta) * step * unit;
+      ctx.lineTo(px, py);
+      hx = nx; hy = ny; t += dt;
+      if (i % 12 === 0) { ctx.stroke(); const left = Math.max(0, 1 - t / (T * fill)); ctx.lineWidth = Math.max(0.3, w0 * (0.3 + 0.7 * left)); ctx.beginPath(); ctx.moveTo(px, py); }
+    }
+    ctx.stroke();
+  }
+
+  function paint(p, N, canvas) {
+    if (p.v2) return paint2(p, N, canvas);
+    canvas.width = canvas.height = N;
+    const ctx = canvas.getContext('2d'), pal = PALETTES[p.pal], R = rng(p.seed);
+    ctx.fillStyle = pal.ground; ctx.fillRect(0, 0, N, N);
+    for (let i = 0; i < p.n; i++) {
+      const hand = gesture(R, p.kind, i, p.n);
+      pour(ctx, N, p, R, hand, pal.inks[i % pal.inks.length]);
+    }
+  }
+
+  // layers with a hierarchy: a few heavy pours, more medium, many fine; built up until the ground mostly goes
+  function paint2(p, N, canvas) {
+    canvas.width = canvas.height = N;
+    const ctx = canvas.getContext('2d'), pal = PALETTES[p.pal], R = rng(p.seed);
+    ctx.fillStyle = pal.ground; ctx.fillRect(0, 0, N, N);
+    const plan = [];
+    for (let i = 0; i < p.heavy; i++) plan.push([3.2, 0]);
+    for (let i = 0; i < p.medium; i++) plan.push([1.2, 1 + (i % 3)]);
+    for (let i = 0; i < p.fine; i++) plan.push([0.35, i % 4]);
+    if (p.order === 'fine-first') plan.reverse();
+    else if (p.order === 'mixed') plan.sort(() => R() - 0.5);
+    for (const [weight, inkIndex] of plan) pourSwing(ctx, N, p, R, pal.inks[inkIndex % pal.inks.length], weight);
+  }
+  function program2(seed) {
+    const R = rng(seed * 40503 + 29);
+    return { v2: true, pal: pick(R, ['pollock', 'pollock', 'ink', 'chalk', 'blue', 'red', 'night']), seed: Math.floor(R() * 1e9),
+             coil: range(R, 0.005, 0.03), width: range(R, 0.0012, 0.004),
+             heavy: 1 + Math.floor(R() * 4), medium: 4 + Math.floor(R() * 14), fine: 6 + Math.floor(R() * 40),
+             order: pick(R, ['heavy-first', 'fine-first', 'mixed']) };
+  }
+
+  const q = new URLSearchParams(location.search);
+  if (q.has('one')) {
+    document.body.className = 'one';
+    const c = document.createElement('canvas'), css = +q.get('css') || 800; document.body.append(c);
+    paint(fromChain(q.get('one')), Math.round(css * devicePixelRatio), c); c.style.width = css + 'px';
+  } else {
+    const grid = document.createElement('div'); grid.className = 'sheet'; document.body.append(grid);
+    const b = +q.get('base') || 1, chain = q.get('chain'), list = q.get('list') && q.get('list').split(',');
+    for (let k = 0; k < (list ? list.length : 16); k++) {
+      const name = list ? list[k] : chain ? chain + '.' + (k + 1) : String(b + k), p = fromChain(name);
+      const cell = document.createElement('div'), c = document.createElement('canvas');
+      cell.append(c, p.v2 ? `${name} ${p.pal} h${p.heavy} m${p.medium} f${p.fine} ${p.order} coil${p.coil.toFixed(3)}` : `${name} ${p.kind} n${p.n} ${p.pal} V${p.vBase.toFixed(2)}±${p.vVar.toFixed(2)}`); grid.append(cell);
+      c.onclick = () => { const u = new URLSearchParams(q); u.set('chain', name); u.delete('base'); u.delete('list'); location.search = u; };
+      paint(p, 500, c);
+    }
+  }
+</script></body></html>
