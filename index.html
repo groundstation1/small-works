@@ -27,7 +27,7 @@
   .stage { position: fixed; inset: 0; overflow: hidden; }
   .slide { position: absolute; top: 50%; left: 50%; width: var(--S); height: var(--S); cursor: pointer; }
   .slide img, .slide iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .slide iframe { opacity: 0; transition: opacity .5s ease; pointer-events: none; }
+  .slide iframe { opacity: 0; transition: opacity .18s linear; pointer-events: none; }
   .slide iframe.ready { opacity: 1; }
   .slide.here { cursor: zoom-out; }
   .slide.here iframe.touch { pointer-events: auto; }
@@ -89,7 +89,7 @@
         const c = (w.cover || 1), v = views(w)[c - 1];
         const t = tile(v.thumb, vt(w.id, c), `${w.title}, ${w.year}`);
         t.onclick = () => go(views(w).length > 1 ? { at: 'series', w } : { at: 'one', w, k: 1 });
-        t.onmouseenter = () => tint(w.ground); t.onmouseleave = () => tint('');
+        t.onmouseenter = () => { tint(w.ground); warm(views(w)); }; t.onmouseleave = () => tint('');
         grid.append(t);
       }
       app.append(grid);
@@ -101,6 +101,7 @@
       grid.style.setProperty('--cols', views(s.w).length <= 4 ? 2 : 3);
       views(s.w).forEach((v, j) => {
         const t = tile(v.thumb, vt(s.w.id, j + 1), `${v.name}, ${s.w.year}`);
+        t.onmouseenter = () => warm([v]);
         t.onclick = () => go({ at: 'one', w: s.w, k: j + 1 });
         grid.append(t);
       });
@@ -124,7 +125,15 @@
           f.title = u.name;
           if (u.interactive) f.className = 'touch';
           f.src = workSrc(u, Object.fromEntries(s.pass || []));
-          f.onload = () => setTimeout(() => f.classList.add('ready'), u.folder === 'drag' ? 60 : 450);
+          // reveal the live work the moment it has drawn, so the swap hides inside the zoom
+          const t0 = performance.now();
+          const ready = () => {
+            let ok = false;
+            try { const win = f.contentWindow, c = f.contentDocument.querySelector('canvas');
+                  ok = c && c.width > 0 && (win.frameCount === undefined || win.frameCount > 0); } catch (e) { ok = true; }
+            if (ok || performance.now() - t0 > 4000) f.classList.add('ready'); else requestAnimationFrame(ready);
+          };
+          requestAnimationFrame(ready);
           slide.append(f);
           if (!u.interactive) slide.onclick = () => go(stepBack(s)); // the same click that zoomed in zooms out
         } else slide.onclick = () => go({ at: 'one', w: s.w, k: j + 1 }, 'replace');
@@ -136,6 +145,16 @@
     back.style.display = s.at === 'all' ? 'none' : '';
   }
 
+  const warmed = new Set();
+  function warm(vs) {                                              // fetch ahead, so the click finds it in cache
+    for (const v of vs) {
+      const base = `works/${v.folder}/`;
+      for (const u of [base + 'index.html', base + (v.folder === 'drag' ? 'plate.js' : 'sketch.js')]) {
+        if (warmed.has(u)) continue; warmed.add(u);
+        const l = document.createElement('link'); l.rel = 'prefetch'; l.href = u; document.head.append(l);
+      }
+    }
+  }
   function el(tag, cls) { const e = document.createElement(tag); e.className = cls; return e; }
   function tile(src, name, label) {
     const t = el('div', 'tile'); t.title = label; t.style.viewTransitionName = name;

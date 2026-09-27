@@ -11,7 +11,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*a, directory=ROOT, **kw)
 
     def end_headers(self):
-        self.send_header('Cache-Control', 'no-store')          # always see the latest while working
+        self.send_header('Cache-Control', 'no-cache')          # revalidate, so edits show but unchanged files come from cache
         super().end_headers()
 
     def do_POST(self):
