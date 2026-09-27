@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>lab · mix</title>
+<style>
+  body { margin: 0; background: #111; color: #888; font: 11px/1.3 ui-monospace, monospace; }
+  .sheet { display: grid; grid-template-columns: repeat(4, auto); gap: 8px; padding: 8px; justify-content: start; }
+  .one { display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+</style></head><body>
+<script>
+  // Colour that exists nowhere in the data: every device pixel is a pure primary (or black/white);
+  // a cellular automaton grows each row from the one above; the eye mixes what it can't resolve.
+  //   ?base=1 · ?chain=4 · ?one=4.2&css=700 · ?zoom=6 (inspect the machine)
+  function rng(seed) { let a = (seed >>> 0) || 1; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const pick = (R, a) => a[Math.floor(R() * a.length)];
+  const INKS = { K: [0, 0, 0], W: [255, 255, 255], R: [255, 0, 0], G: [0, 255, 0], B: [0, 0, 255], C: [0, 255, 255], M: [255, 0, 255], Y: [255, 255, 0] };
+
+  // v2, greys that aren't grey: complementary sets only; the rule is "cycle to the next colour",
+  // with a few entries broken so phases slip and domains meet
+  function grey(seed) {
+    const R = rng(seed * 374761393 + 9);
+    const alpha = pick(R, ['MG', 'RC', 'BY', 'CMY', 'RGB', 'MG', 'BY']);
+    const k = alpha.length, r = pick(R, [1, 1, 2]), n = Math.pow(k, 2 * r + 1);
+    const table = [];
+    for (let i = 0; i < n; i++) { const centre = Math.floor(i / Math.pow(k, r)) % k; table.push((centre + 1) % k); }
+    const breaks = pick(R, [1, 2, 3, 5, 8, 13]);
+    for (let b = 0; b < breaks; b++) table[Math.floor(R() * n)] = Math.floor(R() * k);
+    return { alpha, r, table, totalistic: false, bias: -1, biasP: 0, init: pick(R, ['random', 'single', 'blocks']), seed: Math.floor(R() * 1e9), breaks };
+  }
+  function program(seed) {
+    if (V === 2) return grey(seed);
+    const R = rng(seed * 2246822519 + 5);
+    const alpha = pick(R, ['RGB', 'RGBK', 'RGBW', 'KW', 'RG', 'BY', 'CMY', 'RGBKW', 'RK', 'MG', 'CMYK']);
+    const k = alpha.length, r = pick(R, [1, 1, 2]);                  // states, neighbourhood radius
+    const table = Array.from({ length: Math.pow(k, 2 * r + 1) > 4096 ? 4096 : Math.pow(k, 2 * r + 1) }, () => Math.floor(R() * k));
+    return {
+      alpha, r, table, totalistic: R() < 0.5,
+      bias: R() < 0.3 ? Math.floor(R() * k) : -1, biasP: R() * 0.3,   // a thumb on the scale: some cells forced
+      init: pick(R, ['random', 'single', 'blocks']), seed: Math.floor(R() * 1e9),
+    };
+  }
+  function mutate(p0, m) {
+    const R = rng(m * 7919 + 1), p = JSON.parse(JSON.stringify(p0)), k = p.alpha.length;
+    const n = 1 + Math.floor(R() * 4);
+    for (let i = 0; i < n; i++) p.table[Math.floor(R() * p.table.length)] = Math.floor(R() * k);   // flip a few rules
+    if (R() < 0.2) p.init = pick(R, ['random', 'single', 'blocks']);
+    if (R() < 0.2) p.biasP = R() * 0.3;
+    return p;
+  }
+  const fromChain = c => { const [s, ...ms] = String(c).split('.').map(Number); return ms.reduce(mutate, program(s)); };
+
+  function draw(p, W, H, canvas) {
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d'), id = ctx.createImageData(W, H), d = id.data;
+    const k = p.alpha.length, cols = [...p.alpha].map(ch => INKS[ch]), R = rng(p.seed);
+    let row = new Uint8Array(W), next = new Uint8Array(W);
+    if (p.init === 'random') for (let x = 0; x < W; x++) row[x] = Math.floor(R() * k);
+    if (p.init === 'single') row[W >> 1] = 1 % k;
+    if (p.init === 'blocks') for (let x = 0; x < W; x++) row[x] = Math.floor(x / (W / 7)) % k;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) { const c = cols[row[x]], i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; }
+      for (let x = 0; x < W; x++) {
+        let idx = 0;
+        if (p.totalistic) { for (let o = -p.r; o <= p.r; o++) idx += row[(x + o + W) % W]; }
+        else { for (let o = -p.r; o <= p.r; o++) idx = idx * k + row[(x + o + W) % W]; }
+        let v = p.table[idx % p.table.length];
+        if (p.bias >= 0 && R() < p.biasP) v = p.bias;
+        next[x] = v;
+      }
+      [row, next] = [next, row];
+    }
+    ctx.putImageData(id, 0, 0);
+  }
+
+  const q = new URLSearchParams(location.search), V = +q.get('v') || 1, dpr = devicePixelRatio || 1, zoom = +q.get('zoom') || 1;
+  const place = (canvas, cssW, cssH) => {                       // one data pixel = one device pixel (or zoomed up)
+    canvas.style.width = cssW * zoom + 'px'; canvas.style.height = cssH * zoom + 'px';
+    if (zoom > 1) canvas.style.imageRendering = 'pixelated';
+  };
+  if (q.has('one')) {
+    document.body.className = 'one';
+    const css = +q.get('css') || 600, c = document.createElement('canvas'); document.body.append(c);
+    const W = Math.round(css * dpr / zoom), H = W;
+    draw(fromChain(q.get('one')), W, H, c); place(c, css / zoom, css / zoom);
+  } else {
+    const grid = document.createElement('div'); grid.className = 'sheet'; document.body.append(grid);
+    const b = +q.get('base') || 1, chain = q.get('chain'), list = q.get('list') && q.get('list').split(',');
+    const css = +q.get('css') || 180;
+    for (let k = 0; k < (list ? list.length : 16); k++) {
+      const name = list ? list[k] : chain ? chain + '.' + (k + 1) : String(b + k), p = fromChain(name);
+      const cell = document.createElement('div'), c = document.createElement('canvas');
+      cell.append(c, `${name} ${p.alpha} r${p.r}${p.totalistic ? ' tot' : ''} ${p.init}${p.breaks ? ' b' + p.breaks : ''}`); grid.append(cell);
+      c.onclick = () => { const u = new URLSearchParams(q); u.set('chain', name); u.delete('base'); u.delete('list'); location.search = u; };
+      const W = Math.round(css * dpr);
+      draw(p, W, W, c); place(c, css, css);
+      if (q.has('avg')) {                                            // box-average k×k: the eye at a distance
+        const kk = +q.get('avg') || 4, s = c.getContext('2d').getImageData(0, 0, W, W).data, M = Math.floor(W / kk);
+        const o = document.createElement('canvas'); o.width = o.height = M; const oc = o.getContext('2d'), od = oc.createImageData(M, M);
+        for (let y = 0; y < M; y++) for (let x = 0; x < M; x++) for (let ch = 0; ch < 3; ch++) {
+          let sum = 0; for (let v = 0; v < kk; v++) for (let u = 0; u < kk; u++) sum += s[((y * kk + v) * W + x * kk + u) * 4 + ch];
+          od.data[(y * M + x) * 4 + ch] = sum / (kk * kk); od.data[(y * M + x) * 4 + 3] = 255;
+        }
+        oc.putImageData(od, 0, 0); o.style.width = o.style.height = css + 'px'; c.replaceWith(o); o.onclick = c.onclick;
+      }
+    }
+  }
+</script></body></html>
