@@ -29,7 +29,13 @@
   .slide img, .slide iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
   .slide iframe { opacity: 0; transition: opacity .18s linear; pointer-events: none; }
   .slide iframe.ready { opacity: 1; }
-  .slide.here { cursor: zoom-out; }
+  .live { position: fixed; top: 50%; left: 50%; width: var(--S); height: var(--S); transform: translate(-50%, -50%);
+          opacity: 0; pointer-events: none; z-index: 1; }
+  .live.here { opacity: 1; pointer-events: auto; cursor: zoom-out; }
+  .live img, .live iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .live iframe { opacity: 0; transition: opacity .15s linear; pointer-events: none; background: transparent; }
+  .live iframe.ready { opacity: 1; }
+  .live.here iframe.touch { pointer-events: auto; }
   .slide.here iframe.touch { pointer-events: auto; }
   .slide:not(.here) { opacity: .55; transition: opacity .3s; }
   .slide:not(.here):hover { opacity: .9; }
@@ -89,7 +95,7 @@
         const c = (w.cover || 1), v = views(w)[c - 1];
         const t = tile(v.thumb, vt(w.id, c), `${w.title}, ${w.year}`);
         t.onclick = () => go(views(w).length > 1 ? { at: 'series', w } : { at: 'one', w, k: 1 });
-        t.onmouseenter = () => { tint(w.ground); warm(views(w)); }; t.onmouseleave = () => tint('');
+        t.onmouseenter = () => { tint(w.ground); warm(views(w)); if (views(w).length === 1) layer(views(w)[0]); }; t.onmouseleave = () => tint('');
         grid.append(t);
       }
       app.append(grid);
@@ -101,13 +107,14 @@
       grid.style.setProperty('--cols', views(s.w).length <= 4 ? 2 : 3);
       views(s.w).forEach((v, j) => {
         const t = tile(v.thumb, vt(s.w.id, j + 1), `${v.name}, ${s.w.year}`);
-        t.onmouseenter = () => warm([v]);
+        t.onmouseenter = () => layer(v);                           // start it now; the click will find it running
         t.onclick = () => go({ at: 'one', w: s.w, k: j + 1 });
         grid.append(t);
       });
       app.append(grid);
       grid.onclick = e => { if (e.target === grid) go(stepBack(s)); };
     }
+    for (const e of pool.values()) { e.box.classList.remove('here'); e.box.style.viewTransitionName = ''; }
     if (s.at === 'one') {
       const vs = views(s.w), v = vs[s.k - 1];
       document.title = `${v.name}, ${s.w.year}`;
@@ -115,36 +122,51 @@
       const stage = el('div', 'stage');
       vs.forEach((u, j) => {
         const d = j + 1 - s.k;
-        if (Math.abs(d) > 2) return;                               // only what could be seen
-        const slide = el('div', 'slide' + (d === 0 ? ' here' : ''));
+        if (d === 0 || Math.abs(d) > 2) return;                   // the neighbours; this one is live, above
+        const slide = el('div', 'slide');
         slide.style.transform = `translate(calc(-50% + ${d} * (var(--S) + var(--gap))), -50%)`;
         slide.style.viewTransitionName = vt(s.w.id, j + 1);
         const img = new Image(); img.src = u.thumb; img.alt = ''; slide.append(img);
-        if (d === 0) {
-          const f = document.createElement('iframe');
-          f.title = u.name;
-          if (u.interactive) f.className = 'touch';
-          f.src = workSrc(u, Object.fromEntries(s.pass || []));
-          // reveal the live work the moment it has drawn, so the swap hides inside the zoom
-          const t0 = performance.now();
-          const ready = () => {
-            let ok = false;
-            try { const win = f.contentWindow, c = f.contentDocument.querySelector('canvas');
-                  ok = c && c.width > 0 && (win.frameCount === undefined || win.frameCount > 0); } catch (e) { ok = true; }
-            if (ok || performance.now() - t0 > 4000) f.classList.add('ready'); else requestAnimationFrame(ready);
-          };
-          requestAnimationFrame(ready);
-          slide.append(f);
-          if (!u.interactive) slide.onclick = () => go(stepBack(s)); // the same click that zoomed in zooms out
-        } else slide.onclick = () => go({ at: 'one', w: s.w, k: j + 1 }, 'replace');
+        slide.onclick = () => go({ at: 'one', w: s.w, k: j + 1 }, 'replace');
         stage.append(slide);
       });
       stage.onclick = e => { if (e.target === stage) go(stepBack(s)); };
       app.append(stage);
+      const live = layer(v, Object.fromEntries(s.pass || []));
+      live.box.classList.add('here');
+      live.box.style.viewTransitionName = vt(s.w.id, s.k);
+      live.box.onclick = v.interactive ? null : () => go(stepBack(s));   // the same click that zoomed in zooms out
+      const next = vs[s.k] || vs[s.k - 2];
+      if (next) setTimeout(() => state === s && layer(next), 700);     // have the next one ready too
     }
     back.style.display = s.at === 'all' ? 'none' : '';
   }
 
+  // Live works are loaded ahead of time into invisible layers that already sit where they'll be seen,
+  // so the zoom can morph a still straight into the running work. Never moved (moving reloads an iframe).
+  const pool = new Map();
+  function layer(v, extra = {}) {
+    const src = workSrc(v, extra);
+    let e = pool.get(src);
+    if (e) { pool.delete(src); pool.set(src, e); return e; }        // most recently used last
+    const box = el('div', 'live'), img = new Image(), f = document.createElement('iframe');
+    img.src = v.thumb; img.alt = '';
+    f.title = v.name; if (v.interactive) f.className = 'touch';
+    box.append(img, f); document.body.append(box);
+    e = { box, f }; pool.set(src, e);
+    const t0 = performance.now();
+    const check = () => {
+      let ok = false;
+      try { const win = f.contentWindow; ok = win.location.href !== 'about:blank' && (win.drawn === true || win.frameCount > 0); } catch (err) { ok = true; }
+      if (ok || performance.now() - t0 > 6000) f.classList.add('ready'); else setTimeout(check, 30);
+    };
+    f.src = src; check();
+    for (const [k, old] of pool) {                                    // keep a few, drop the oldest idle ones
+      if (pool.size <= 3) break;
+      if (!old.box.classList.contains('here')) { old.box.remove(); pool.delete(k); }
+    }
+    return e;
+  }
   const warmed = new Set();
   function warm(vs) {                                              // fetch ahead, so the click finds it in cache
     for (const v of vs) {

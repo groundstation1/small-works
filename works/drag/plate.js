@@ -36,6 +36,7 @@ function draw() {
   ctx.fillText('Claude Opus 5.5, 2026', x0 + N, below);
   ctx.textAlign = 'left';
   ctx.fillText(['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'][plate - 1] + '/IX', x0, below);
+  window.drawn = true;                                             // tells the gallery it can show the live plate
 }
 
 draw();
