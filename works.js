@@ -8,6 +8,7 @@
 //   items    a series made of separate works: each its own folder under works/
 //   grounds  per-plate ground colours, if they differ
 //   seriesView  a plate that is itself the best view of the whole set; shown instead of the grid
+//   aspect   plates wider than square hang at this width:height in the series view
 //   cover    which plate or item stands for the series in the overview
 // Stills live in thumbs/<id>-<n>.jpg (made by lab/thumbs.html, served by lab/serve.py).
 window.WORKS = [
@@ -81,6 +82,15 @@ window.WORKS = [
     ground: '#0a0a0a',
     plates: ['I', 'II', 'III', 'IV', 'V', 'VI'],
     cover: 3,
+  },
+  {
+    id: 'figure',
+    title: 'Figure',
+    year: 2026,
+    ground: '#070707',
+    aspect: 2.4,
+    plates: ['I', 'II', 'III', 'IV', 'V', 'VI'],
+    cover: 1,
   },
 ];
 

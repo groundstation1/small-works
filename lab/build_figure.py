@@ -3,6 +3,8 @@ import json, os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLATES = json.loads(open(os.path.join(ROOT, 'lab', 'figure-plates.json'), encoding='utf8').read())
+LAB = open(os.path.join(ROOT, 'lab', 'body.html'), encoding='utf8').read()
+HUMAN = LAB[LAB.index('  const PROFILE = {'):LAB.index('  // poses: sharp single silhouettes')]
 
 JS = r"""// Figure: a simulated body (bones, joints, gravity, a floor, rhythmic muscles, a posture reflex)
 // in a dark room, photographed with the shutter open. You never see it; only the light it leaves.
@@ -20,14 +22,22 @@ const BONES = [[0, 1], [1, 11], [11, 2], [2, 3], [3, 4], [2, 5], [5, 6], [1, 7],
 const THICK = [0.2, 0.32, 0.27, 0.16, 0.12, 0.16, 0.12, 0.1, 0.08, 0.1, 0.08];
 const MUSCLES = { neck: [1, 11, 0], spine: [11, 2, 1], hipL: [2, 11, 3], kneeL: [3, 2, 4], hipR: [2, 11, 5], kneeR: [5, 2, 6], shL: [1, 11, 7], elL: [7, 1, 8], shR: [1, 11, 9], elR: [9, 1, 10] };
 const REST_ANGLE = { neck: 0, spine: 0, hipL: 0, kneeL: 0, hipR: 0, kneeR: 0, shL: Math.PI, elL: 0, shR: Math.PI, elR: 0 };
-const DT = 1 / 240, SPAN = 7, GAIN = 6 / 255, RIM = 0.05, FILL = 0.22, SOFT = 0.035;   // metres of blur on the shadowed mass
+__HUMAN__
+let SPAN = 8;                                                          // metres of floor the plate shows, at least
+const DT = 1 / 240, GAIN = (+q.get('gain') || 11) / 255, RIM = 0.05, FILL = 0.22, SOFT = 0.035;   // metres of blur on the shadowed mass
 
 const ang = (x, y) => Math.atan2(y, x), wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 const rot = (pt, c, a) => { const dx = pt[0] - c[0], dy = pt[1] - c[1]; return [c[0] + dx * Math.cos(a) - dy * Math.sin(a), c[1] + dx * Math.sin(a) + dy * Math.cos(a)]; };
 
+// framed like a photographer would: run the movement once unseen, then centre the plate on where it went
+let START = 1.2;
+{ const probe = body(); let lo = 1e9, hi = -1e9;
+  while (probe.t < p.T) { probe.step(); for (const [x] of probe.P) { lo = Math.min(lo, x); hi = Math.max(hi, x); } }
+  SPAN = Math.max(SPAN, hi - lo + 1.6);                                // a longer movement: step back
+  START += SPAN / 2 - (lo + hi) / 2; }
 function body() {
-  const P = REST.map(([x, y]) => [x + 0.8, y + 0.02]), O = P.map(([x, y]) => [x - p.vx / 240, y]);
-  for (const qq of [P, O]) for (const pt of qq) { const dx = pt[0] - 0.8, dy = pt[1]; pt[0] = 0.8 + dx * Math.cos(p.lean) + dy * Math.sin(p.lean); pt[1] = -dx * Math.sin(p.lean) + dy * Math.cos(p.lean) + 0.02; }
+  const P = REST.map(([x, y]) => [x + START, y + 0.02]), O = P.map(([x, y]) => [x - p.vx / 240, y]);
+  for (const qq of [P, O]) for (const pt of qq) { const dx = pt[0] - START, dy = pt[1]; pt[0] = START + dx * Math.cos(p.lean) + dy * Math.sin(p.lean); pt[1] = -dx * Math.sin(p.lean) + dy * Math.cos(p.lean) + 0.02; }
   const L = BONES.map(([a, b]) => Math.hypot(REST[a][0] - REST[b][0], REST[a][1] - REST[b][1]));
   let s = 0;
   return {
@@ -67,7 +77,7 @@ function body() {
 
 // the plate
 const plate = document.createElement('canvas'); plate.id = 'plate'; document.body.append(plate);
-const W = STILL ? 1800 : Math.min(2400, Math.round(innerWidth * (devicePixelRatio || 1))), H = Math.round(W / 3), K = W / SPAN;
+const W = STILL ? 1800 : Math.min(2400, Math.round(innerWidth * (devicePixelRatio || 1))), H = Math.round(W / 2.4), K = W / SPAN;
 plate.width = W; plate.height = H;
 const c = plate.getContext('2d');
 const mk = () => { const x = document.createElement('canvas'); x.width = W; x.height = H; return [x, x.getContext('2d')]; };
@@ -77,8 +87,7 @@ sfc.globalCompositeOperation = src.globalCompositeOperation = 'lighter';
 
 function instant(P) {                                                  // one instant: silhouette, and its lit edge
   fc.clearRect(0, 0, W, H);
-  BONES.forEach(([i, j], b) => { fc.lineWidth = THICK[b] * K; fc.beginPath(); fc.moveTo(P[i][0] * K, H - 0.12 * K - P[i][1] * K); fc.lineTo(P[j][0] * K, H - 0.12 * K - P[j][1] * K); fc.stroke(); });
-  fc.beginPath(); fc.arc(P[0][0] * K, H - 0.12 * K - P[0][1] * K, 0.12 * K, 0, 7); fc.fill();
+  drawHuman(fc, P, K, H);
   rc.globalCompositeOperation = 'copy'; rc.drawImage(f, 0, 0);
   rc.globalCompositeOperation = 'destination-out'; rc.drawImage(f, RIM * K * 0.8, RIM * K * 0.6);
   sfc.globalAlpha = 1 / 8; sfc.drawImage(f, 0, 0);
@@ -123,7 +132,7 @@ if (STILL) {
 """
 
 os.makedirs(os.path.join(ROOT, 'works', 'figure'), exist_ok=True)
-open(os.path.join(ROOT, 'works', 'figure', 'figure.js'), 'w', encoding='utf8').write(JS.replace('__PLATES__', json.dumps(PLATES)))
+open(os.path.join(ROOT, 'works', 'figure', 'figure.js'), 'w', encoding='utf8').write(JS.replace('__PLATES__', json.dumps(PLATES)).replace('__HUMAN__', HUMAN))
 open(os.path.join(ROOT, 'works', 'figure', 'index.html'), 'w', encoding='utf8').write("""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Figure</title>
 <style>html, body { margin: 0; height: 100%; overflow: hidden; background: #070707; } body { display: flex; align-items: center; justify-content: center; }

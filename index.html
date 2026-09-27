@@ -21,6 +21,8 @@
   .tile { position: relative; width: clamp(200px, 34vmin, 440px); aspect-ratio: 1; cursor: zoom-in; }
   .grid.series { gap: 3vmin; max-width: calc(var(--cols) * 27vmin + (var(--cols) - 1) * 3vmin + 10vw); }   /* a series hangs as a block */
   .grid.series .tile { width: 27vmin; }
+  .grid.series.wide { max-width: 100vw; padding: 8vh 3vw; gap: 3vmin 2vw; }
+  .grid.series.wide .tile { width: min(45vw, 26vh * var(--aspect)); aspect-ratio: var(--aspect); }
   .tile img { width: 100%; height: 100%; object-fit: cover; }
 
   /* one work: a strip of the series, this one in the middle, its neighbours at the edges */
@@ -117,8 +119,9 @@
     if (s.at === 'series' && !s.w.seriesView) {
       document.title = `${s.w.title}, ${s.w.year}`;
       tint(s.w.ground);
-      const grid = el('div', 'grid series');
+      const grid = el('div', 'grid series' + (s.w.aspect ? ' wide' : ''));
       grid.style.setProperty('--cols', views(s.w).length <= 4 ? 2 : 3);
+      if (s.w.aspect) grid.style.setProperty('--aspect', s.w.aspect);   // wide plates hang at their own shape
       views(s.w).forEach((v, j) => {
         const t = tile(v.thumb, vt(s.w.id, j + 1), `${v.name}, ${s.w.year}`);
         t.onmouseenter = () => layer(v);                           // start it now; the click will find it running
