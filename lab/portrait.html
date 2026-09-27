@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>lab · portrait</title>
+<script src="drag.js?v=5"></script>
+<style>
+  body { margin: 0; background: #2a2a2a; color: #888; font: 11px ui-monospace, monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+  canvas { width: min(92vh, 92vw); height: min(92vh, 92vw); }
+</style></head><body><canvas id="c"></canvas><div id="info"></div>
+<script>
+  // The easel: renders lab/portrait.json. ?upto=n shows the state after n passes.
+  (async () => {
+    const p = await (await fetch('portrait.json?' + Date.now())).json();
+    const q = new URLSearchParams(location.search);
+    const upto = q.has('upto') ? +q.get('upto') : p.marks.length;
+    const N = 800;
+    const layers = p.marks.slice(0, upto).map((m, r) => ({
+      a: 0, b: 1, s: 0, e: 1, load: null, K: 0, D: 0.5, press: 1, colVar: 0.2, colFreq: 60,
+      skip: 0.2, skipFreq: 8, chatter: 0, chatterFreq: 60, blend: 'mix', ...m, nseed: (r + 1) * 7919,
+    }));
+    const img = render({ bg: p.ground, layers }, N);
+    toCanvas(img, N, document.getElementById('c'));
+    document.getElementById('info').textContent = `round ${upto} / ${p.marks.length}`;
+  })();
+</script></body></html>

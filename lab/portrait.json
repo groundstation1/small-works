@@ -1,0 +1,203 @@
+{
+ "rules": "One pass per round, chosen after looking at full size. No undo, no re-roll: each pass's blade is seeded by its round number. Stop when it holds, or at 40.",
+ "ground": [
+  0.93,
+  0.92,
+  0.89
+ ],
+ "marks": [
+  {
+   "dir": "down",
+   "a": 0.18,
+   "b": 0.31,
+   "load": [
+    [
+     0.08,
+     0.09,
+     0.16
+    ]
+   ],
+   "K": 0.05,
+   "D": 0.7,
+   "press": 0.9,
+   "colVar": 0.3,
+   "colFreq": 90,
+   "skip": 0.5,
+   "skipFreq": 5
+  },
+  {
+   "dir": "down",
+   "a": 0.16,
+   "b": 0.34,
+   "load": null,
+   "K": 0.92,
+   "D": 0.9,
+   "press": 1.0,
+   "colVar": 0.35,
+   "colFreq": 140,
+   "skip": 0.25,
+   "skipFreq": 3
+  },
+  {
+   "dir": "down",
+   "a": 0.16,
+   "b": 0.34,
+   "load": null,
+   "K": 0.012,
+   "D": 0.75,
+   "press": 1.0,
+   "colVar": 0.35,
+   "colFreq": 140,
+   "skip": 0.3,
+   "skipFreq": 3
+  },
+  {
+   "dir": "left",
+   "a": 0.66,
+   "b": 0.72,
+   "s": 0.35,
+   "e": 1,
+   "load": [
+    [
+     0.55,
+     0.25,
+     0.12
+    ]
+   ],
+   "K": 0.01,
+   "D": 0.6,
+   "press": 0.9,
+   "colVar": 0.4,
+   "colFreq": 200,
+   "skip": 0.4,
+   "skipFreq": 6
+  },
+  {
+   "dir": "up",
+   "a": 0,
+   "b": 1,
+   "load": [
+    [
+     0.8,
+     0.86,
+     0.93
+    ]
+   ],
+   "K": 0.0,
+   "D": 0.45,
+   "press": 0.8,
+   "colVar": 0.5,
+   "colFreq": 260,
+   "skip": 0.45,
+   "skipFreq": 11,
+   "blend": "mul"
+  },
+  {
+   "dir": "down",
+   "a": 0.62,
+   "b": 0.8,
+   "s": 0.05,
+   "e": 0.93,
+   "load": [
+    [
+     0.9,
+     0.88,
+     0.82
+    ]
+   ],
+   "K": 0.02,
+   "D": 0.5,
+   "press": 0.9,
+   "colVar": 0.3,
+   "colFreq": 50,
+   "skip": 0.5,
+   "skipFreq": 4,
+   "blend": "diff"
+  },
+  {
+   "dir": "left",
+   "a": 0.2,
+   "b": 0.8,
+   "s": 0.25,
+   "e": 0.79,
+   "load": null,
+   "K": 0.025,
+   "D": 0.55,
+   "press": 1.0,
+   "colVar": 0.45,
+   "colFreq": 180,
+   "skip": 0.35,
+   "skipFreq": 5
+  },
+  {
+   "dir": "right",
+   "a": 0.5,
+   "b": 0.97,
+   "s": 0.12,
+   "e": 1,
+   "load": null,
+   "K": 0.03,
+   "D": 0.5,
+   "press": 1.0,
+   "colVar": 0.5,
+   "colFreq": 220,
+   "skip": 0.4,
+   "skipFreq": 7
+  },
+  {
+   "dir": "right",
+   "a": 0.09,
+   "b": 0.17,
+   "s": 0,
+   "e": 1,
+   "load": [
+    [
+     0.05,
+     0.06,
+     0.14
+    ]
+   ],
+   "K": 0.004,
+   "D": 0.85,
+   "press": 1.0,
+   "colVar": 0.3,
+   "colFreq": 120,
+   "skip": 0.55,
+   "skipFreq": 9
+  },
+  {
+   "dir": "down",
+   "a": 0,
+   "b": 1,
+   "load": null,
+   "K": 0.04,
+   "D": 0.35,
+   "press": 1.0,
+   "colVar": 0.55,
+   "colFreq": 240,
+   "skip": 0.5,
+   "skipFreq": 6
+  },
+  {
+   "dir": "up",
+   "a": 0,
+   "b": 1,
+   "s": 0.2,
+   "e": 1,
+   "load": [
+    [
+     0.93,
+     0.92,
+     0.89
+    ]
+   ],
+   "K": 0.0,
+   "D": 0.6,
+   "press": 1.0,
+   "colVar": 0.4,
+   "colFreq": 200,
+   "skip": 0.55,
+   "skipFreq": 4
+  }
+ ]
+}

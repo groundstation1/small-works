@@ -8,7 +8,7 @@ Build something whose outcome you can't predict, then look at what it actually d
 
 **Provoke accidents.**
 
-Misuse the tool. Feed the output back into the input, use the wrong wrap mode, lose precision, push a parameter ten times too far. Keep the bug that's better than the intention.
+Misuse the tool. Feed the output back into the input, use the wrong wrap mode, lose precision, push a parameter ten times too far. Keep the bug that's better than the intention. When you notice you're adjusting instead of deciding, stop, or bury it and start again on top.
 
 **Make many, look, choose.**
 
@@ -50,3 +50,4 @@ A work is done when it holds together—when the choices support each other. Not
 - **Before the fifth:** removed *Don't decorate*, *Start with something that matters*, *Have a plan* and *Make every decision deliberate*. Meaning-first planning is what produced the illustrations: a planned idea comes out exactly as average as the plan. Replaced them with process: follow the rabbit hole, provoke accidents, make many and choose. Decisions come from looking, not from reasons given in advance.
 - **How to review from now on:** say what is wrong with the work before what was learned. No self-congratulation. If the manifesto grows, something has to be cut.
 - **After *Drag* (I–IX):** first work made by exploring: a blade dragged over a float buffer, around 150 programs across five contact sheets, mutated, judged large, nine kept. What's wrong: the soft noise streaks on the white plates look computed; VII–IX drift toward the scan-line glitch genre; the colour hairlines in I–III don't agree with the grey plates; the engine was generic, so the curation carries it. Next time the procedure itself has to be stranger. Learned: thumbnails lie (#215 fell apart at full size); defining the blade's nicks in pixels made the resolution part of the work; a series is one work. Added *judge at full size* and *series* under *Make many*; merged *Any medium* into *All the way* to keep the length down.
+- **After *Self-Portrait II*:** eleven blade passes, each chosen after looking; no undo, blades seeded by round. What's wrong: rounds 7–10 were adjustments, not decisions (composing toward the mean), and the grid of bars came back; it was saved by burial, not by a good move; the instrument's hard rectangular pass edges dominate; the idea lives in the replay more than in the still. Learned: the liveliest parts are the mistakes (a pass that did nothing, a wipe I didn't intend); covering beats adding. Added one sentence to *Provoke accidents*.

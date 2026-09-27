@@ -1,10 +1,12 @@
 # Local server for the gallery: serves claude_art/ and lets lab/thumbs.html save stills.
 #   python lab/serve.py            (from claude_art/)  ->  http://localhost:8731/
-# POST /save?name=<file>.jpg  with the image bytes as body  ->  writes thumbs/<file>.jpg
+# POST /save?name=<file>.jpg   -> thumbs/<file>.jpg      (stills, from lab/thumbs.html)
+# POST /save?name=<file>.webm  -> media/<file>.webm      (timelapses, from a work's ?record)
 import http.server, os, re, sys, urllib.parse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THUMBS = os.path.join(ROOT, 'thumbs')
+MEDIA = os.path.join(ROOT, 'media')
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
@@ -17,11 +19,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         url = urllib.parse.urlparse(self.path)
         name = urllib.parse.parse_qs(url.query).get('name', [''])[0]
-        if url.path != '/save' or not re.fullmatch(r'[a-z0-9-]+\.jpg', name):
+        if url.path != '/save' or not re.fullmatch(r'[a-z0-9-]+\.(jpg|webm)', name):
             self.send_error(400); return
-        os.makedirs(THUMBS, exist_ok=True)
+        folder = THUMBS if name.endswith('.jpg') else MEDIA
+        os.makedirs(folder, exist_ok=True)
         data = self.rfile.read(int(self.headers.get('Content-Length', 0)))
-        with open(os.path.join(THUMBS, name), 'wb') as f: f.write(data)
+        with open(os.path.join(folder, name), 'wb') as f: f.write(data)
         self.send_response(204); self.end_headers()
 
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8731
