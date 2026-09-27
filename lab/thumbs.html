@@ -18,8 +18,14 @@
         f.src = '../' + workSrc(vs[k], { still: '' });
         document.body.append(f);
         await new Promise(r => f.onload = r);
-        await wait(2500);                                       // let it finish drawing
-        const c = f.contentDocument.querySelector('canvas');
+        await wait(600);
+        for (let t = 0; t < 600 && !f.contentWindow.drawn; t++) await wait(100);   // until the work says it has drawn
+        await wait(400);
+        let c = f.contentDocument.querySelector('canvas');
+        if (c.width < 800) {                                    // small canvases: enlarge with hard pixels, as shown
+          const big = document.createElement('canvas'); big.width = big.height = 1024;
+          const bx = big.getContext('2d'); bx.imageSmoothingEnabled = false; bx.drawImage(c, 0, 0, 1024, 1024); c = big;
+        }
         const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
         const name = `${w.id}-${k + 1}.jpg`;
         await fetch('/save?name=' + name, { method: 'POST', body: blob });

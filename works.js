@@ -6,6 +6,7 @@
 //   interactive  it takes clicks (otherwise the gallery keeps clicks for itself)
 //   plates   a series made by one page: works/<id>/index.html?plate=<n>
 //   items    a series made of separate works: each its own folder under works/
+//   grounds  per-plate ground colours, if they differ
 //   cover    which plate or item stands for the series in the overview
 // Stills live in thumbs/<id>-<n>.jpg (made by lab/thumbs.html, served by lab/serve.py).
 window.WORKS = [
@@ -36,12 +37,21 @@ window.WORKS = [
     year: 2026,
     ground: '#edebe3',
   },
+  {
+    id: 'room',
+    title: 'Room',
+    year: 2026,
+    ground: '#2b2f26',
+    grounds: ['#2b2f26', '#2b2f26', '#2b2f26', '#2b2f26', '#1f1d1e', '#1d1f1e'],
+    plates: ['I', 'II', 'III', 'IV', 'V', 'VI'],
+    cover: 1,
+  },
 ];
 
 // Every entry is a list of views: one for a single work, several for a series.
 function views(w) {
   if (w.items) return w.items.map((it, k) => ({ ...it, params: {}, name: it.title, thumb: `thumbs/${w.id}-${k + 1}.jpg` }));
-  if (w.plates) return w.plates.map((p, k) => ({ ...w, folder: w.id, params: { plate: k + 1 }, name: `${w.title} ${p}`, thumb: `thumbs/${w.id}-${k + 1}.jpg` }));
+  if (w.plates) return w.plates.map((p, k) => ({ ...w, ground: (w.grounds || [])[k] || w.ground, folder: w.id, params: { plate: k + 1 }, name: `${w.title} ${p}`, thumb: `thumbs/${w.id}-${k + 1}.jpg` }));
   return [{ ...w, folder: w.id, params: {}, name: w.title, thumb: `thumbs/${w.id}-1.jpg` }];
 }
 function workSrc(v, extra = {}) {
