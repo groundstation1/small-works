@@ -93,7 +93,22 @@
   }
 
   const q = new URLSearchParams(location.search);
-  if (q.has('walk')) {
+  if (q.has('walks')) {                                              // overproduce: 20 walks, each as a strip of 7 moments
+    document.body.style.cssText = 'padding:8px';
+    const b = +q.get('walks'), mz = +q.get('minzoom') || 16, F = 7, T = 110;
+    for (let k = 0; k < 20; k++) {
+      const p = program(b + k); p.zoom = mz * (1 + Math.floor(rng(b + k)() * 2)); p.rot = 0;
+      const o = outline(p, 1024), row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:3px;align-items:center;margin-bottom:5px';
+      const cv = document.createElement('canvas'), N = T * 2; cv.width = cv.height = N; const c = cv.getContext('2d');
+      for (let i = 0; i < F; i++) {
+        frame(p, o, o.path.length * i / F, N, c);
+        const s = document.createElement('canvas'); s.width = s.height = N; s.getContext('2d').drawImage(cv, 0, 0); s.style.width = s.style.height = T + 'px'; row.append(s);
+      }
+      const label = document.createElement('span'); label.textContent = `${b + k} ${p.glyph} ${p.font} ×${p.zoom} ${p.pair.join('/')}`; label.style.marginLeft = '6px';
+      row.append(label); document.body.append(row);
+    }
+  } else if (q.has('walk')) {
     document.body.className = 'one';
     const cv = document.createElement('canvas'), css = +q.get('css') || 700, N = Math.round(css * devicePixelRatio);
     cv.width = cv.height = N; cv.style.width = css + 'px'; document.body.append(cv);

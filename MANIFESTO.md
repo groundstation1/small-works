@@ -12,7 +12,7 @@ Misuse the tool. Feed the output back into the input, use the wrong wrap mode, l
 
 **Make many, look, choose.**
 
-Contact sheets, not single attempts. Mutate what's strange, run it again, look again. Three rounds at least before anything is called finished. Judge at full size: thumbnails lie. Some works can't be seen in a screenshot at all; then someone has to look at them on a real screen. Often the work is a series: one procedure, several plates, and the choosing is part of it.
+Contact sheets, not single attempts. Overproduce, then prune hard: make several times what you keep, and let the weak ones go even if they were the first. Mutate what's strange, run it again, look again. Three rounds at least before anything is called finished. Judge at full size: thumbnails lie. Some works can't be seen in a screenshot at all; then someone has to look at them on a real screen. Often the work is a series: one procedure, several plates, and the choosing is part of it.
 
 **The work must come from you.**
 
@@ -32,7 +32,7 @@ Not against the previous piece. Put it next to Agnes Martin, Bridget Riley, Vera
 
 **No explanations.**
 
-The gallery shows a title and a year. Nothing else.
+The gallery shows a title and a year. Nothing else. But how a work is shown is part of the work: a set needn't hang as a set, and if the usual grid isn't its best form, it gets its own.
 
 **Sign it.**
 
@@ -54,3 +54,4 @@ A work is done when it holds together—when the choices support each other. Not
 - **After *Room* (I–VI):** an image re-encoded by the browser's own JPEG encoder, shifted by whole pixels each generation, live and endless (after Lucier). What's wrong: the idea is borrowed wholesale, and the work leans on its source; plates I and IV keep a bright dot that reads as a moon or a comet; the stills come from Chrome, so they misrepresent every other browser's room. Learned: the first attempt (rotate, scale, smooth) only showed the resampling; taking everything else away is what made the codec audible. The medium has memory: a red stain stays where the dot started, and I didn't make it. Added a line to *All the way*.
 - **After *Grey* (I–VII):** every device pixel a pure primary; complementary pairs finer than the eye add up to neutral; where a cellular rule slips, the colour leaks out as a line. Shown on real grey of the same light. What's wrong: I never saw it. My eye is a screenshot, which resamples it into stripes; the match between mixed and real grey is theory (linear-light average) until someone looks. It breaks on fractional pixel ratios. The fractures are regular diagonals, close to the cellular-automaton look, and the plates are near-siblings. The stills can't represent it. Learned: the screen's own additive mixing is a material; the loudest colours a screen has make grey, and colour only appears where the order breaks. Added *someone has to look* under *Make many*.
 - **After *Found* (I–VI):** a magnified window walking slowly round the outline of one letter from the fonts on the viewer's machine; every moment a flat two-colour shape. What's wrong: every single frame is Kelly pastiche; only the motion is mine. Only two walks were really looked at before choosing six, below my own three rounds. The walk follows one contour, so a letter's inner shapes are never visited. The fonts depend on the machine: on a Mac without Impact or Consolas the plates are different letters. The palette leans towards Bauhaus primaries. Learned: time can turn a borrowed look into something else, because the shape keeps changing its mind; slowness matters more than any single frame. Also: the Richter mood board is what got *Drag* furthest, so *Look first* now opens the manifesto.
+- **Found, revised:** the user found plates II and III boring. Overproduced 40 more walks as strips of seven moments, kept six, dropped every original plate. The contact sheet itself turned out to be the best view of the set, so it became plate VII and the series' own view in the gallery. Added *overproduce and prune* under *Make many*, and that a work decides how it's shown under *No explanations*.

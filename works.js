@@ -7,6 +7,7 @@
 //   plates   a series made by one page: works/<id>/index.html?plate=<n>
 //   items    a series made of separate works: each its own folder under works/
 //   grounds  per-plate ground colours, if they differ
+//   seriesView  a plate that is itself the best view of the whole set; shown instead of the grid
 //   cover    which plate or item stands for the series in the overview
 // Stills live in thumbs/<id>-<n>.jpg (made by lab/thumbs.html, served by lab/serve.py).
 window.WORKS = [
@@ -59,9 +60,10 @@ window.WORKS = [
     title: 'Found',
     year: 2026,
     ground: '#141414',
-    grounds: ['#141414', '#1d3f96', '#1d3f96', '#f4f1ea', '#7fb3d9', '#d42a20'],
-    plates: ['I', 'II', 'III', 'IV', 'V', 'VI'],
-    cover: 1,
+    grounds: ['#e8a6b8', '#f4f1ea', '#141414', '#141414', '#1f7a4a', '#1d3f96', '#e4e2dc'],
+    plates: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'],
+    cover: 7,
+    seriesView: 7,
   },
 ];
 

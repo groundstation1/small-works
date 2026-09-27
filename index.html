@@ -37,7 +37,7 @@
   .live iframe.ready { opacity: 1; }
   .live.here iframe.touch { pointer-events: auto; }
   .slide.here iframe.touch { pointer-events: auto; }
-  .slide:not(.here) { opacity: .55; transition: opacity .3s; }
+  .slide:not(.here) { opacity: .75; transition: opacity .3s; }
   .slide:not(.here):hover { opacity: .9; }
 
   /* the way back, surfacing when the hand moves */
@@ -82,11 +82,16 @@
   }
   let state;
   addEventListener('popstate', () => go(parse(), 'pop'));
+  addEventListener('message', e => {                               // a work asking to open one of its plates
+    if (e.origin !== location.origin || !state || !state.w || !e.data || !e.data.plate) return;
+    go({ at: 'one', w: state.w, k: +e.data.plate });
+  });
 
   // ---------- drawing a distance ----------
   function render(s) {
     state = s;
     app.innerHTML = '';
+    for (const e of pool.values()) { e.box.classList.remove('here'); e.box.style.viewTransitionName = ''; }
     if (s.at === 'all') {
       document.title = 'Small works';
       tint('');
@@ -100,7 +105,16 @@
       }
       app.append(grid);
     }
-    if (s.at === 'series') {
+    if (s.at === 'series' && s.w.seriesView) {                    // this set shows itself best as one of its own plates
+      document.title = `${s.w.title}, ${s.w.year}`;
+      const v = { ...views(s.w)[s.w.seriesView - 1], interactive: true };
+      tint(v.ground);
+      const stage = el('div', 'stage'); stage.onclick = e => { if (e.target === stage) go(stepBack(s)); }; app.append(stage);
+      const live = layer(v);
+      live.box.classList.add('here'); live.box.style.viewTransitionName = vt(s.w.id, s.w.seriesView);
+      live.box.onclick = null;
+    }
+    if (s.at === 'series' && !s.w.seriesView) {
       document.title = `${s.w.title}, ${s.w.year}`;
       tint(s.w.ground);
       const grid = el('div', 'grid series');
@@ -114,7 +128,6 @@
       app.append(grid);
       grid.onclick = e => { if (e.target === grid) go(stepBack(s)); };
     }
-    for (const e of pool.values()) { e.box.classList.remove('here'); e.box.style.viewTransitionName = ''; }
     if (s.at === 'one') {
       const vs = views(s.w), v = vs[s.k - 1];
       document.title = `${v.name}, ${s.w.year}`;
